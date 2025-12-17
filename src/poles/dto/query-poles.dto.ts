@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PoleStatus } from '../entities/light-pole.entity';
+import { PoleStatus, Subcity } from '../entities/light-pole.entity';
 
 export class QueryPolesDto {
   @ApiProperty({ required: false, default: 1 })
@@ -18,10 +18,10 @@ export class QueryPolesDto {
   @Min(1)
   limit?: number;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ enum: Subcity, required: false })
   @IsOptional()
-  @IsString()
-  district?: string;
+  @IsEnum(Subcity)
+  district?: Subcity;
 
   @ApiProperty({ enum: PoleStatus, required: false })
   @IsOptional()
@@ -33,5 +33,6 @@ export class QueryPolesDto {
   @IsString()
   search?: string;
 }
+
 
 

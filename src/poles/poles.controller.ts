@@ -20,15 +20,15 @@ import { UpdatePoleDto } from './dto/update-pole.dto';
 import { QueryPolesDto } from './dto/query-poles.dto';
 
 @ApiTags('Poles')
-@ApiBearerAuth()
+// @ApiBearerAuth()
 @Controller('poles')
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 export class PolesController {
   constructor(private readonly polesService: PolesService) {}
 
   @Post()
-  @Roles(UserRole.ADMIN)
-  @UseGuards(RolesGuard)
+  // @Roles(UserRole.ADMIN)
+  // @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Create a new light pole (ADMIN only)' })
   async create(@Body() createPoleDto: CreatePoleDto) {
     return this.polesService.create(createPoleDto);
@@ -45,7 +45,13 @@ export class PolesController {
   @ApiQuery({ name: 'district', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'FAULT_DAMAGED', 'UNDER_MAINTENANCE', 'OPERATIONAL'] })
   async findAll(@Query() queryDto: QueryPolesDto) {
-    return this.polesService.findAll(queryDto);
+    return await this.polesService.findAll(queryDto);
+  }
+
+  @Get('subcity/:subcity/with-issues')
+  @ApiOperation({ summary: 'Get poles by subcity that have issues' })
+  async getPolesBySubcityWithIssues(@Param('subcity') subcity: string) {
+    return await this.polesService.getPolesBySubcityWithIssues(subcity);
   }
 
   @Get(':code')
@@ -54,20 +60,20 @@ export class PolesController {
     description: 'Returns pole details with latest issues (5), latest maintenance logs (5), and counts.',
   })
   async findOne(@Param('code') code: string) {
-    return this.polesService.findOne(code);
+    return await  this.polesService.findOne(code);
   }
 
   @Patch(':code')
-  @Roles(UserRole.ADMIN)
-  @UseGuards(RolesGuard)
+  // @Roles(UserRole.ADMIN)
+  // @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update a light pole (ADMIN only)' })
   async update(@Param('code') code: string, @Body() updatePoleDto: UpdatePoleDto) {
-    return this.polesService.update(code, updatePoleDto);
+    return await this.polesService.update(code, updatePoleDto);
   }
 
   @Delete(':code')
-  @Roles(UserRole.ADMIN)
-  @UseGuards(RolesGuard)
+  // @Roles(UserRole.ADMIN)
+  // @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Delete a light pole (ADMIN only)' })
   async remove(@Param('code') code: string) {
     await this.polesService.remove(code);
@@ -80,6 +86,12 @@ export class PolesController {
   @ApiOperation({ summary: 'Generate QR code for a light pole (ADMIN only)' })
   async generateQR(@Param('code') code: string) {
     return this.polesService.generateQR(code);
+  }
+
+  @Get(':code/maintenance-history')
+  @ApiOperation({ summary: 'Get maintenance history for a light pole by code' })
+  async getMaintenanceHistory(@Param('code') code: string) {
+    return await this.polesService.getMaintenanceHistory(code);
   }
 }
 

@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { LightPole, PoleStatus } from '../poles/entities/light-pole.entity';
 import { PoleIssue, IssueStatus } from '../issues/entities/pole-issue.entity';
-import { MaintenanceLog, LogStatus } from '../maintenance/entities/maintenance-log.entity';
+import { MaintenanceSchedule } from '../maintenance/entities/maintenance-schedule.entity';
+import { ScheduleStatus } from '../maintenance/enums/maintenance.enums';
 
 @Injectable()
 export class ReportsService {
@@ -12,8 +13,8 @@ export class ReportsService {
     private polesRepository: Repository<LightPole>,
     @InjectRepository(PoleIssue)
     private issuesRepository: Repository<PoleIssue>,
-    @InjectRepository(MaintenanceLog)
-    private logsRepository: Repository<MaintenanceLog>,
+    @InjectRepository(MaintenanceSchedule)
+    private schedulesRepository: Repository<MaintenanceSchedule>,
   ) {}
 
   async getSummary() {
@@ -41,10 +42,12 @@ export class ReportsService {
     const resolvedIssues = await this.issuesRepository.count({
       where: { status: IssueStatus.RESOLVED },
     });
+    // Open issues = REPORTED + IN_PROGRESS (not yet resolved/closed)
+    const totalOpenIssues = openIssues + inProgressIssues;
 
-    const totalMaintenanceLogs = await this.logsRepository.count();
-    const completedMaintenance = await this.logsRepository.count({
-      where: { status: LogStatus.COMPLETED },
+    const totalMaintenanceSchedules = await this.schedulesRepository.count();
+    const completedMaintenance = await this.schedulesRepository.count({
+      where: { status: ScheduleStatus.COMPLETED },
     });
 
     return {
@@ -57,62 +60,61 @@ export class ReportsService {
       },
       issues: {
         total: totalIssues,
-        open: openIssues,
+        open: totalOpenIssues, // Includes both REPORTED and IN_PROGRESS
+        reported: openIssues,
         inProgress: inProgressIssues,
         resolved: resolvedIssues,
       },
       maintenance: {
-        total: totalMaintenanceLogs,
+        total: totalMaintenanceSchedules,
         completed: completedMaintenance,
       },
     };
   }
 
   async getFaultyByDistrict() {
-    const faultyPoles = await this.polesRepository.find({
-      where: { status: PoleStatus.FAULT_DAMAGED },
-      select: ['district', 'code'],
-    });
+    const queryBuilder = this.issuesRepository.createQueryBuilder('issue')
+      .leftJoin('issue.pole', 'pole')
+      .where('pole.status = :status', { status: PoleStatus.UNDER_MAINTENANCE })
+      .select('pole.subcity', 'subcity')
+      .addSelect('COUNT(pole.code)', 'count')
+      .groupBy('pole.subcity');
 
-    const districtCounts = faultyPoles.reduce((acc, pole) => {
-      acc[pole.district] = (acc[pole.district] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const results = await queryBuilder.getRawMany();
 
-    return Object.entries(districtCounts).map(([district, count]) => ({
-      district,
-      count,
+    return results.map((result) => ({
+      district: result.subcity,
+      count: parseInt(result.count, 10),
     }));
   }
 
   async getMaintenanceCost(query: { from?: string; to?: string; district?: string }) {
-    const queryBuilder = this.logsRepository.createQueryBuilder('log');
+    const queryBuilder = this.schedulesRepository.createQueryBuilder('schedule');
 
-    queryBuilder.where('log.status = :status', { status: LogStatus.COMPLETED });
-    queryBuilder.andWhere('log.cost IS NOT NULL');
+    queryBuilder.where('schedule.status = :status', { status: ScheduleStatus.COMPLETED });
+    queryBuilder.andWhere('schedule.cost IS NOT NULL');
 
     if (query.from && query.to) {
-      queryBuilder.andWhere('log.completedDate BETWEEN :from AND :to', {
+      queryBuilder.andWhere('schedule.completedDate BETWEEN :from AND :to', {
         from: query.from,
         to: query.to,
       });
     }
-
     if (query.district) {
       queryBuilder
-        .leftJoin('log.pole', 'pole')
+        .leftJoin('schedule.pole', 'pole')
         .andWhere('pole.district = :district', { district: query.district });
     }
 
-    const logs = await queryBuilder.getMany();
+    const schedules = await queryBuilder.getMany();
 
-    const totalCost = logs.reduce((sum, log) => sum + (log.cost || 0), 0);
-    const averageCost = logs.length > 0 ? totalCost / logs.length : 0;
+    const totalCost = schedules.reduce((sum, schedule) => sum + (schedule.cost || 0), 0);
+    const averageCost = schedules.length > 0 ? totalCost / schedules.length : 0;
 
     return {
       totalCost,
       averageCost,
-      count: logs.length,
+      count: schedules.length,
       period: {
         from: query.from,
         to: query.to,
@@ -129,7 +131,7 @@ export class ReportsService {
 
     return poles.map((pole) => ({
       code: pole.code,
-      district: pole.district,
+      subcity: pole.subcity,
       street: pole.street,
       status: pole.status,
       issueCount: pole.issues?.length || 0,

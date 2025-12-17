@@ -9,13 +9,43 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ScheduleFrequency, ScheduleStatus } from '../entities/maintenance-schedule.entity';
+import { ScheduleFrequency, ScheduleStatus } from '../enums/maintenance.enums';
 
 export class CreateScheduleDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   poleCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  parkCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  parkingLotCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  museumCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  publicToiletCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  footballFieldCode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  riverSideProjectCode?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { PoleIssue, IssueStatus } from './entities/pole-issue.entity';
 import { PoleIssueAttachment } from './entities/pole-issue-attachment.entity';
@@ -31,6 +31,23 @@ export class IssuesService {
   async create(createIssueDto: CreateIssueDto, reportedById: string) {
     // Verify pole exists
     const pole = await this.polesService.findOne(createIssueDto.poleCode);
+
+    // Check if there's an unclosed issue for this pole
+    const unclosedIssue = await this.issuesRepository.findOne({
+      where: {
+        poleCode: createIssueDto.poleCode,
+        status: In([
+          IssueStatus.REPORTED,
+          IssueStatus.IN_PROGRESS,
+        ]),
+      },
+    });
+
+    if (unclosedIssue) {
+      throw new BadRequestException(
+        `Cannot create issue: There is already an unclosed issue (${unclosedIssue.status}) for pole ${createIssueDto.poleCode}. Please resolve or close the existing issue first.`,
+      );
+    }
 
     const issue = this.issuesRepository.create({
       poleCode: createIssueDto.poleCode,
@@ -112,6 +129,35 @@ export class IssuesService {
       return null;
     }
     return this.updateStatus(latest.id, updateStatusDto);
+  }
+
+  async remove(id: string): Promise<void> {
+    const issue = await this.findOne(id);
+    
+    // Only allow deletion of REPORTED (draft) issues
+    if (issue.status !== IssueStatus.REPORTED) {
+      throw new BadRequestException('Only REPORTED (draft) issues can be deleted');
+    }
+
+    // Delete attachments files if any
+    if (issue.attachments && issue.attachments.length > 0) {
+      const uploadDir = this.configService.get<string>('UPLOAD_DIR', './uploads');
+      const publicBaseUrl = this.configService.get<string>('PUBLIC_BASE_URL', '');
+      
+      for (const attachment of issue.attachments) {
+        try {
+          // Extract relative path from full URL
+          const relativePath = attachment.fileUrl.replace(publicBaseUrl, '');
+          const filePath = path.join(uploadDir, relativePath.replace(/^\//, ''));
+          await fs.unlink(filePath);
+        } catch (error) {
+          // Ignore file deletion errors (file might not exist)
+          console.error(`Failed to delete attachment file: ${attachment.fileUrl}`, error);
+        }
+      }
+    }
+
+    await this.issuesRepository.remove(issue);
   }
 
   async addAttachment(

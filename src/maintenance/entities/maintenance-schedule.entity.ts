@@ -5,23 +5,22 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
-import { MaintenanceLog } from './maintenance-log.entity';
+import { MaintenanceAttachment } from './maintenance-attachment.entity';
+import { LightPole } from '../../poles/entities/light-pole.entity';
+import { PublicPark } from '../../parks/entities/public-park.entity';
+import { ParkingLot } from '../../parking-lots/entities/parking-lot.entity';
+import { Museum } from '../../museums/entities/museum.entity';
+import { PublicToilet } from '../../public-toilets/entities/public-toilet.entity';
+import { FootballField } from '../../football-fields/entities/football-field.entity';
+import { RiverSideProject } from '../../river-side-projects/entities/river-side-project.entity';
+import { User } from '../../users/entities/user.entity';
 
-export enum ScheduleFrequency {
-  DAILY = 'DAILY',
-  WEEKLY = 'WEEKLY',
-  MONTHLY = 'MONTHLY',
-  QUARTERLY = 'QUARTERLY',
-  YEARLY = 'YEARLY',
-}
+import { ScheduleFrequency, ScheduleStatus } from '../enums/maintenance.enums';
 
-export enum ScheduleStatus {
-  REQUESTED = 'REQUESTED',
-  STARTED = 'STARTED',
-  PAUSED = 'PAUSED',
-  COMPLETED = 'COMPLETED',
-}
+export { ScheduleFrequency, ScheduleStatus };
 
 @Entity('maintenance_schedules')
 export class MaintenanceSchedule {
@@ -30,6 +29,52 @@ export class MaintenanceSchedule {
 
   @Column({ nullable: true })
   poleCode: string;
+
+  @ManyToOne(() => LightPole, { nullable: true })
+  @JoinColumn({ name: 'poleCode', referencedColumnName: 'code' })
+  pole: LightPole;
+
+  @Column({ nullable: true })
+  parkCode: string;
+
+  @ManyToOne(() => PublicPark, { nullable: true })
+  @JoinColumn({ name: 'parkCode', referencedColumnName: 'code' })
+  park: PublicPark;
+
+  @Column({ nullable: true })
+  parkingLotCode: string;
+
+  @ManyToOne(() => ParkingLot, { nullable: true })
+  @JoinColumn({ name: 'parkingLotCode', referencedColumnName: 'code' })
+  parkingLot: ParkingLot;
+
+  @Column({ nullable: true })
+  museumCode: string;
+
+  @ManyToOne(() => Museum, { nullable: true })
+  @JoinColumn({ name: 'museumCode', referencedColumnName: 'code' })
+  museum: Museum;
+
+  @Column({ nullable: true })
+  publicToiletCode: string;
+
+  @ManyToOne(() => PublicToilet, { nullable: true })
+  @JoinColumn({ name: 'publicToiletCode', referencedColumnName: 'code' })
+  publicToilet: PublicToilet;
+
+  @Column({ nullable: true })
+  footballFieldCode: string;
+
+  @ManyToOne(() => FootballField, { nullable: true })
+  @JoinColumn({ name: 'footballFieldCode', referencedColumnName: 'code' })
+  footballField: FootballField;
+
+  @Column({ nullable: true })
+  riverSideProjectCode: string;
+
+  @ManyToOne(() => RiverSideProject, { nullable: true })
+  @JoinColumn({ name: 'riverSideProjectCode', referencedColumnName: 'code' })
+  riverSideProject: RiverSideProject;
 
   @Column({ type: 'uuid', nullable: true })
   issueId: string;
@@ -63,11 +108,29 @@ export class MaintenanceSchedule {
   @Column('decimal', { precision: 10, scale: 2, nullable: true })
   estimatedCost: number;
 
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  cost: number;
+
+  @Column('uuid', { nullable: true })
+  performedById: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'performedById' })
+  performedBy: User;
+
+  @Column('date', { nullable: true })
+  completedDate: Date;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
   @Column({ type: 'text', nullable: true })
   remark: string;
 
-  @OneToMany(() => MaintenanceLog, (log) => log.schedule)
-  logs: MaintenanceLog[];
+  @OneToMany(() => MaintenanceAttachment, (attachment) => attachment.schedule, {
+    cascade: true,
+  })
+  attachments: MaintenanceAttachment[];
 
   @CreateDateColumn()
   createdAt: Date;

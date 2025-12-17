@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -23,8 +24,6 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
-import { CreateLogDto } from './dto/create-log.dto';
-import { QueryLogsDto } from './dto/query-logs.dto';
 
 @ApiTags('Maintenance')
 @ApiBearerAuth()
@@ -41,8 +40,8 @@ export class MaintenanceController {
 
   @Get('schedules')
   @ApiOperation({ summary: 'Get all maintenance schedules' })
-  async findAllSchedules() {
-    return this.maintenanceService.findAllSchedules();
+  async findAllSchedules(@Query('type') type?: string) {
+    return this.maintenanceService.findAllSchedules(type);
   }
 
   @Patch('schedules/:id')
@@ -54,28 +53,14 @@ export class MaintenanceController {
     return this.maintenanceService.updateSchedule(id, updateScheduleDto);
   }
 
-  @Post('logs')
-  @ApiOperation({ summary: 'Create a maintenance log' })
-  async createLog(
-    @Body() createLogDto: CreateLogDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.maintenanceService.createLog(createLogDto, user.userId);
+  @Delete('schedules/:id')
+  @ApiOperation({ summary: 'Delete a maintenance schedule (only REQUESTED status)' })
+  async removeSchedule(@Param('id') id: string) {
+    await this.maintenanceService.removeSchedule(id);
+    return { message: 'Maintenance schedule deleted successfully' };
   }
 
-  @Get('logs')
-  @ApiOperation({ summary: 'Get all maintenance logs' })
-  async findAllLogs(@Query() queryDto: QueryLogsDto) {
-    return this.maintenanceService.findAllLogs(queryDto);
-  }
-
-  @Get('logs/:id')
-  @ApiOperation({ summary: 'Get a maintenance log by ID' })
-  async findOneLog(@Param('id') id: string) {
-    return this.maintenanceService.findOneLog(id);
-  }
-
-  @Post('logs/:id/attachments')
+  @Post('schedules/:id/attachments')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -89,7 +74,7 @@ export class MaintenanceController {
       },
     },
   })
-  @ApiOperation({ summary: 'Upload attachment to a maintenance log' })
+  @ApiOperation({ summary: 'Upload attachment to a maintenance schedule' })
   async addAttachment(
     @Param('id') id: string,
     @UploadedFile(
@@ -105,5 +90,6 @@ export class MaintenanceController {
     return this.maintenanceService.addAttachment(id, file);
   }
 }
+
 
 

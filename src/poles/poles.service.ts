@@ -11,7 +11,7 @@ import { CreatePoleDto } from './dto/create-pole.dto';
 import { UpdatePoleDto } from './dto/update-pole.dto';
 import { QueryPolesDto } from './dto/query-poles.dto';
 import { PoleIssue, IssueStatus } from '../issues/entities/pole-issue.entity';
-import { MaintenanceLog } from '../maintenance/entities/maintenance-log.entity';
+import { MaintenanceSchedule } from '../maintenance/entities/maintenance-schedule.entity';
 import * as QRCode from 'qrcode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -23,8 +23,8 @@ export class PolesService {
     private polesRepository: Repository<LightPole>,
     @InjectRepository(PoleIssue)
     private issuesRepository: Repository<PoleIssue>,
-    @InjectRepository(MaintenanceLog)
-    private maintenanceLogsRepository: Repository<MaintenanceLog>,
+    @InjectRepository(MaintenanceSchedule)
+    private maintenanceSchedulesRepository: Repository<MaintenanceSchedule>,
     private configService: ConfigService,
   ) {}
 
@@ -126,8 +126,8 @@ export class PolesService {
       take: 5,
     });
 
-    // Get latest maintenance logs (last 5)
-    const latestMaintenanceLogs = await this.maintenanceLogsRepository.find({
+    // Get latest maintenance schedules (last 5)
+    const latestMaintenanceSchedules = await this.maintenanceSchedulesRepository.find({
       where: { poleCode: code },
       relations: ['performedBy'],
       order: { createdAt: 'DESC' },
@@ -149,18 +149,18 @@ export class PolesService {
       },
     });
 
-    const totalMaintenanceLogs = await this.maintenanceLogsRepository.count({
+    const totalMaintenanceSchedules = await this.maintenanceSchedulesRepository.count({
       where: { poleCode: code },
     });
 
     return {
       ...pole,
       latestIssues,
-      latestMaintenanceLogs,
+      latestMaintenanceSchedules,
       counts: {
         totalIssues,
         openIssues,
-        totalMaintenanceLogs,
+        totalMaintenanceSchedules,
       },
     };
   }
@@ -206,6 +206,50 @@ export class PolesService {
     pole.qrImageUrl = `${publicBaseUrl}/uploads/qr/${qrFileName}`;
 
     return this.polesRepository.save(pole);
+  }
+
+  async getMaintenanceHistory(code: string) {
+    // Verify pole exists
+    await this.findOneByCode(code);
+
+    // Get all maintenance schedules (logs) for this pole
+    const schedules = await this.maintenanceSchedulesRepository.find({
+      where: { poleCode: code },
+      relations: ['performedBy', 'attachments'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return schedules;
+  }
+
+  async getPolesBySubcityWithIssues(subcity: string) {
+    // Get poles by subcity that have at least one issue
+    const poles = await this.polesRepository
+      .createQueryBuilder('pole')
+      .innerJoin('pole.issues', 'issue')
+      .where('pole.district = :subcity', { subcity })
+      .select([
+        'pole.code',
+        'pole.district',
+        'pole.street',
+        'pole.status',
+        'pole.gpsLat',
+        'pole.gpsLng',
+        'pole.poleType',
+        'pole.heightMeters',
+        'pole.lampType',
+        'pole.powerRatingWatt',
+        'pole.hasLedDisplay',
+        'pole.ledModel',
+        'pole.qrImageUrl',
+        'pole.createdAt',
+        'pole.updatedAt',
+      ])
+      .distinct(true)
+      .orderBy('pole.createdAt', 'DESC')
+      .getMany();
+
+    return poles;
   }
 }
 

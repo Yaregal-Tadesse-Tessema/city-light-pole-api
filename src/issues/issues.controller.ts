@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -45,6 +46,15 @@ export class IssuesController {
   @ApiOperation({ summary: 'Get all issues' })
   async findAll() {
     return this.issuesService.findAll();
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.MAINTENANCE_ENGINEER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Delete an issue (only REPORTED status)' })
+  async remove(@Param('id') id: string) {
+    await this.issuesService.remove(id);
+    return { message: 'Issue deleted successfully' };
   }
 
   @Get(':id')
@@ -101,5 +111,6 @@ export class IssuesController {
     return this.issuesService.addAttachment(id, file, type);
   }
 }
+
 
 

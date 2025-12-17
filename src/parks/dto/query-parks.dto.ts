@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { LogStatus } from '../entities/maintenance-log.entity';
+import { ParkStatus, Subcity } from '../entities/public-park.entity';
 
-export class QueryLogsDto {
+export class QueryParksDto {
   @ApiProperty({ required: false, default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -18,15 +18,19 @@ export class QueryLogsDto {
   @Min(1)
   limit?: number;
 
+  @ApiProperty({ enum: Subcity, required: false })
+  @IsOptional()
+  @IsEnum(Subcity)
+  district?: Subcity;
+
+  @ApiProperty({ enum: ParkStatus, required: false })
+  @IsOptional()
+  @IsEnum(ParkStatus)
+  status?: ParkStatus;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  poleCode?: string;
-
-  @ApiProperty({ enum: LogStatus, required: false })
-  @IsOptional()
-  @IsEnum(LogStatus)
-  status?: LogStatus;
+  search?: string;
 }
-
 

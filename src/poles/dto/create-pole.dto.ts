@@ -9,16 +9,16 @@ import {
   Max,
   ValidateIf,
 } from 'class-validator';
-import { PoleType, LampType, PoleStatus } from '../entities/light-pole.entity';
+import { PoleType, LampType, PoleStatus, Subcity } from '../entities/light-pole.entity';
 
 export class CreatePoleDto {
   @ApiProperty({ example: 'LP-001', description: 'Unique pole code' })
   @IsString()
   code: string;
 
-  @ApiProperty({ example: 'Downtown', description: 'District name' })
-  @IsString()
-  district: string;
+  @ApiProperty({ enum: Subcity, example: Subcity.BOLE, description: 'Subcity name' })
+  @IsEnum(Subcity)
+  district: Subcity;
 
   @ApiProperty({ example: 'Main Street', description: 'Street name' })
   @IsString()
@@ -46,9 +46,8 @@ export class CreatePoleDto {
   poleType?: PoleType;
 
   @ApiProperty({ example: 8.5, description: 'Height in meters' })
-  @IsNumber()
-  @Min(0)
-  heightMeters: number;
+  @IsOptional()
+  heightMeters?: number;
 
   @ApiProperty({ enum: LampType, default: LampType.LED, required: false })
   @IsEnum(LampType)

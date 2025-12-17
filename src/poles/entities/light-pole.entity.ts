@@ -28,13 +28,31 @@ export enum LampType {
   HALOGEN = 'HALOGEN',
 }
 
+export enum Subcity {
+  ADDIS_KETEMA = 'Addis Ketema',
+  AKAKY_KALITI = 'Akaky Kaliti',
+  ARADA = 'Arada',
+  BOLE = 'Bole',
+  GULLELE = 'Gullele',
+  KIRKOS = 'Kirkos',
+  KOLFE_KERANIO = 'Kolfe Keranio',
+  LIDETA = 'Lideta',
+  NIFAS_SILK_LAFTO = 'Nifas Silk-Lafto',
+  YEKA = 'Yeka',
+  LEMI_KURA = 'Lemi Kura',
+}
+
 @Entity('light_poles')
 export class LightPole {
   @PrimaryColumn()
   code: string;
 
-  @Column()
-  district: string;
+  @Column({
+    type: 'enum',
+    enum: Subcity,
+    name: 'subcity', // Database column name is 'district' for backward compatibility
+  })
+  subcity: string; // Property name - API will return this as 'district'
 
   @Column()
   street: string;

@@ -13,13 +13,14 @@ export class ReportsController {
   @Get('summary')
   @ApiOperation({ summary: 'Get summary statistics' })
   async getSummary() {
-    return this.reportsService.getSummary();
+    return await this.reportsService.getSummary();
   }
 
   @Get('faulty-by-district')
-  @ApiOperation({ summary: 'Get faulty poles grouped by district' })
+  @ApiOperation({ summary: 'Get faulty poles grouped by subcity' })
+  // @ApiQuery({ name: 'subcity', required: false, type: String, description: 'Filter by specific subcity' })
   async getFaultyByDistrict() {
-    return this.reportsService.getFaultyByDistrict();
+    return await this.reportsService.getFaultyByDistrict();
   }
 
   @Get('maintenance-cost')
@@ -32,14 +33,15 @@ export class ReportsController {
     @Query('to') to?: string,
     @Query('district') district?: string,
   ) {
-    return this.reportsService.getMaintenanceCost({ from, to, district });
+    return await this.reportsService.getMaintenanceCost({ from, to, district });
   }
 
   @Get('inspection')
   @ApiOperation({ summary: 'Get inspection report' })
   async getInspectionReport() {
-    return this.reportsService.getInspectionReport();
+    return await this.reportsService.getInspectionReport();
   }
 }
+
 
 
