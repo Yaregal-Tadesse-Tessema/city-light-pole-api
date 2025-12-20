@@ -17,10 +17,14 @@ export class ReportsController {
   }
 
   @Get('faulty-by-district')
-  @ApiOperation({ summary: 'Get faulty poles grouped by subcity' })
-  // @ApiQuery({ name: 'subcity', required: false, type: String, description: 'Filter by specific subcity' })
-  async getFaultyByDistrict() {
-    return await this.reportsService.getFaultyByDistrict();
+  @ApiOperation({ summary: 'Get faulty assets grouped by subcity' })
+  @ApiQuery({ name: 'subcity', required: false, type: String, description: 'Filter by specific subcity' })
+  @ApiQuery({ name: 'assetType', required: false, type: String, description: 'Asset type: pole, park, parking, museum, toilet, football, river' })
+  async getFaultyByDistrict(
+    @Query('subcity') subcity?: string,
+    @Query('assetType') assetType?: string,
+  ) {
+    return await this.reportsService.getFaultyByDistrict(subcity, assetType);
   }
 
   @Get('maintenance-cost')
@@ -40,6 +44,42 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get inspection report' })
   async getInspectionReport() {
     return await this.reportsService.getInspectionReport();
+  }
+
+  @Get('maintenance-poles-by-street')
+  @ApiOperation({ summary: 'Get maintenance poles grouped by street' })
+  async getMaintenancePolesByStreet() {
+    return await this.reportsService.getMaintenancePolesByStreet();
+  }
+
+  @Get('maintenance-poles-by-subcity')
+  @ApiOperation({ summary: 'Get maintenance poles grouped by subcity' })
+  async getMaintenancePolesBySubcity() {
+    return await this.reportsService.getMaintenancePolesBySubcity();
+  }
+
+  @Get('failed-poles-by-street')
+  @ApiOperation({ summary: 'Get failed poles grouped by street' })
+  async getFailedPolesByStreet() {
+    return await this.reportsService.getFailedPolesByStreet();
+  }
+
+  @Get('failed-poles-by-subcity')
+  @ApiOperation({ summary: 'Get failed poles grouped by subcity' })
+  async getFailedPolesBySubcity() {
+    return await this.reportsService.getFailedPolesBySubcity();
+  }
+
+  @Get('operational-poles-by-street')
+  @ApiOperation({ summary: 'Get operational poles grouped by street' })
+  async getOperationalPolesByStreet() {
+    return await this.reportsService.getOperationalPolesByStreet();
+  }
+
+  @Get('operational-poles-by-subcity')
+  @ApiOperation({ summary: 'Get operational poles grouped by subcity' })
+  async getOperationalPolesBySubcity() {
+    return await this.reportsService.getOperationalPolesBySubcity();
   }
 }
 

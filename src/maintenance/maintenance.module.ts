@@ -12,6 +12,7 @@ import { PublicToiletsModule } from '../public-toilets/public-toilets.module';
 import { FootballFieldsModule } from '../football-fields/football-fields.module';
 import { RiverSideProjectsModule } from '../river-side-projects/river-side-projects.module';
 import { IssuesModule } from '../issues/issues.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { IssuesModule } from '../issues/issues.module';
     FootballFieldsModule,
     RiverSideProjectsModule,
     forwardRef(() => IssuesModule),
+    NotificationsModule,
   ],
   controllers: [MaintenanceController],
   providers: [MaintenanceService],

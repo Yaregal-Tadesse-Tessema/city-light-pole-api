@@ -6,15 +6,18 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  BadRequestException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { IssuesService } from './issues.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -23,6 +26,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueStatusDto } from './dto/update-issue-status.dto';
+import { QueryIssuesDto } from './dto/query-issues.dto';
 
 @ApiTags('Issues')
 @ApiBearerAuth()
@@ -43,9 +47,17 @@ export class IssuesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all issues' })
-  async findAll() {
-    return this.issuesService.findAll();
+  @ApiOperation({
+    summary: 'Get all issues with pagination and filters',
+    description: 'Returns paginated list of issues. Supports filtering by status, severity, and search query.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search in description or pole code' })
+  @ApiQuery({ name: 'status', required: false, enum: ['REPORTED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'], description: 'Filter by status' })
+  @ApiQuery({ name: 'severity', required: false, enum: ['LOW', 'MEDIUM', 'HIGH'], description: 'Filter by severity' })
+  async findAll(@Query() queryDto: QueryIssuesDto) {
+    return this.issuesService.findAll(queryDto);
   }
 
   @Delete(':id')
@@ -77,38 +89,48 @@ export class IssuesController {
   @Post(':id/attachments')
   @Roles(UserRole.ADMIN, UserRole.MAINTENANCE_ENGINEER)
   @UseGuards(RolesGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('files', 10))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
         },
         type: {
           type: 'string',
           enum: ['BEFORE', 'AFTER'],
+          default: 'AFTER',
         },
       },
     },
   })
-  @ApiOperation({ summary: 'Upload attachment to an issue' })
-  async addAttachment(
+  @ApiOperation({ summary: 'Upload multiple attachments to an issue' })
+  async addAttachments(
     @Param('id') id: string,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif)$/ }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
-    @Body('type') type: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('type') type: string = 'AFTER',
   ) {
-    return this.issuesService.addAttachment(id, file, type);
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files provided');
+    }
+    return this.issuesService.addAttachments(id, files, type);
+  }
+
+  @Delete(':id/attachments/:attachmentId')
+  @Roles(UserRole.ADMIN, UserRole.MAINTENANCE_ENGINEER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Delete an attachment from an issue (only if issue is not closed)' })
+  async deleteAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    return this.issuesService.deleteAttachment(id, attachmentId);
   }
 }
 

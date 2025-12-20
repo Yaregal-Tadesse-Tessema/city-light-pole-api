@@ -32,6 +32,8 @@ import { MuseumsModule } from '../museums/museums.module';
 import { PublicToiletsModule } from '../public-toilets/public-toilets.module';
 import { FootballFieldsModule } from '../football-fields/football-fields.module';
 import { RiverSideProjectsModule } from '../river-side-projects/river-side-projects.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { FileModule } from '../file/file.module';
 
 @Module({
   imports: [
@@ -55,6 +57,8 @@ import { RiverSideProjectsModule } from '../river-side-projects/river-side-proje
     forwardRef(() => PublicToiletsModule),
     forwardRef(() => FootballFieldsModule),
     forwardRef(() => RiverSideProjectsModule),
+    NotificationsModule,
+    FileModule,
   ],
   controllers: [
     IssuesController,

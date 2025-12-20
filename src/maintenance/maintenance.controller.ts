@@ -15,7 +15,7 @@ import {
   FileTypeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { MaintenanceService } from './maintenance.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,6 +24,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { QueryMaintenanceDto } from './dto/query-maintenance.dto';
 
 @ApiTags('Maintenance')
 @ApiBearerAuth()
@@ -39,9 +40,17 @@ export class MaintenanceController {
   }
 
   @Get('schedules')
-  @ApiOperation({ summary: 'Get all maintenance schedules' })
-  async findAllSchedules(@Query('type') type?: string) {
-    return this.maintenanceService.findAllSchedules(type);
+  @ApiOperation({
+    summary: 'Get all maintenance schedules with pagination and filters',
+    description: 'Returns paginated list of maintenance schedules. Supports filtering by asset type, status, and search query.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 10000)' })
+  @ApiQuery({ name: 'type', required: false, description: 'Filter by asset type (pole, park, parking, museum, toilet, football, river)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search in description or asset code' })
+  @ApiQuery({ name: 'status', required: false, enum: ['REQUESTED', 'STARTED', 'PAUSED', 'COMPLETED'], description: 'Filter by status' })
+  async findAllSchedules(@Query() queryDto: QueryMaintenanceDto) {
+    return this.maintenanceService.findAllSchedules(queryDto);
   }
 
   @Patch('schedules/:id')

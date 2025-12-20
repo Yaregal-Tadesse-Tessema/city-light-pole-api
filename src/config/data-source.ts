@@ -28,6 +28,13 @@ import { MuseumMaintenance } from '../museums/entities/museum-maintenance.entity
 import { PublicToiletMaintenance } from '../public-toilets/entities/public-toilet-maintenance.entity';
 import { FootballFieldMaintenance } from '../football-fields/entities/football-field-maintenance.entity';
 import { RiverSideProjectMaintenance } from '../river-side-projects/entities/river-side-project-maintenance.entity';
+import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { InventoryTransaction } from '../inventory/entities/inventory-transaction.entity';
+import { Category } from '../inventory/entities/category.entity';
+import { MaterialRequest } from '../inventory/entities/material-request.entity';
+import { MaterialRequestItem } from '../inventory/entities/material-request-item.entity';
+import { PurchaseRequest } from '../inventory/entities/purchase-request.entity';
+import { PurchaseRequestItem } from '../inventory/entities/purchase-request-item.entity';
 
 loadEnv();
 
@@ -73,46 +80,60 @@ if (databaseUrl) {
       PublicToiletMaintenance,
       FootballFieldMaintenance,
       RiverSideProjectMaintenance,
-    ],
-    migrations: ['src/migrations/*.ts'],
-    synchronize: false,
-  };
-} else {
-  dataSourceConfig = {
-    type: 'postgres',
-    host: configService.get('DB_HOST', 'localhost'),
-    port: parseInt(configService.get('DB_PORT', '5432'), 10),
-    username: configService.get('DB_USERNAME', 'postgres'),
-    password: configService.get('DB_PASSWORD', 'postgres'),
-    database: configService.get('DB_NAME', 'CityLightPoleDev'),
-    entities: [
-      User,
-      LightPole,
-      PublicPark,
-      ParkingLot,
-      Museum,
-      PublicToilet,
-      FootballField,
-      RiverSideProject,
-      PoleIssue,
-      PoleIssueAttachment,
-      ParkIssue,
-      ParkIssueAttachment,
-      ParkingLotIssue,
-      ParkingLotIssueAttachment,
-      MuseumIssue,
-      MuseumIssueAttachment,
-      PublicToiletIssue,
-      FootballFieldIssue,
-      RiverSideProjectIssue,
-      MaintenanceSchedule,
-      MaintenanceAttachment,
-      ParkMaintenance,
-      ParkingLotMaintenance,
-      MuseumMaintenance,
-      PublicToiletMaintenance,
-      FootballFieldMaintenance,
-      RiverSideProjectMaintenance,
+              InventoryItem,
+              InventoryTransaction,
+              Category,
+              MaterialRequest,
+              MaterialRequestItem,
+              PurchaseRequest,
+              PurchaseRequestItem,
+            ],
+            migrations: ['src/migrations/*.ts'],
+            synchronize: false,
+          };
+        } else {
+          dataSourceConfig = {
+            type: 'postgres',
+            host: configService.get('DB_HOST', 'localhost'),
+            port: parseInt(configService.get('DB_PORT', '5432'), 10),
+            username: configService.get('DB_USERNAME', 'postgres'),
+            password: configService.get('DB_PASSWORD', 'postgres'),
+            database: configService.get('DB_NAME', 'CityLightPoleDev'),
+            entities: [
+              User,
+              LightPole,
+              PublicPark,
+              ParkingLot,
+              Museum,
+              PublicToilet,
+              FootballField,
+              RiverSideProject,
+              PoleIssue,
+              PoleIssueAttachment,
+              ParkIssue,
+              ParkIssueAttachment,
+              ParkingLotIssue,
+              ParkingLotIssueAttachment,
+              MuseumIssue,
+              MuseumIssueAttachment,
+              PublicToiletIssue,
+              FootballFieldIssue,
+              RiverSideProjectIssue,
+              MaintenanceSchedule,
+              MaintenanceAttachment,
+              ParkMaintenance,
+              ParkingLotMaintenance,
+              MuseumMaintenance,
+              PublicToiletMaintenance,
+              FootballFieldMaintenance,
+              RiverSideProjectMaintenance,
+              InventoryItem,
+              InventoryTransaction,
+              Category,
+              MaterialRequest,
+              MaterialRequestItem,
+              PurchaseRequest,
+              PurchaseRequestItem,
     ],
     migrations: ['src/migrations/*.ts'],
     synchronize: false,

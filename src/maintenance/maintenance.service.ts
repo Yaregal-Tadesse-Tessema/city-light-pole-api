@@ -7,6 +7,7 @@ import { ScheduleStatus } from './enums/maintenance.enums';
 import { MaintenanceAttachment } from './entities/maintenance-attachment.entity';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { QueryMaintenanceDto } from './dto/query-maintenance.dto';
 import { IssuesService } from '../issues/issues.service';
 import { ParkIssuesService } from '../issues/park-issues.service';
 import { ParkingLotIssuesService } from '../issues/parking-lot-issues.service';
@@ -15,6 +16,7 @@ import { PublicToiletIssuesService } from '../issues/public-toilet-issues.servic
 import { FootballFieldIssuesService } from '../issues/football-field-issues.service';
 import { RiverSideProjectIssuesService } from '../issues/river-side-project-issues.service';
 import { IssueStatus } from '../issues/entities/pole-issue.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PolesService } from '../poles/poles.service';
 import { ParksService } from '../parks/parks.service';
 import { ParkingLotsService } from '../parking-lots/parking-lots.service';
@@ -61,6 +63,7 @@ export class MaintenanceService {
     private publicToiletsService: PublicToiletsService,
     private footballFieldsService: FootballFieldsService,
     private riverSideProjectsService: RiverSideProjectsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   private async updateAnyIssueStatus(issueId: string, payload: { status: IssueStatus; resolutionNotes?: string }) {
@@ -233,10 +236,48 @@ export class MaintenanceService {
     }
 
     const schedule = this.schedulesRepository.create(createScheduleDto);
-    return this.schedulesRepository.save(schedule);
+    const savedSchedule = await this.schedulesRepository.save(schedule);
+
+    // Send notification to maintenance managers
+    let assetCode = '';
+    let assetTitle = `Maintenance: ${createScheduleDto.description || 'Asset'}`;
+
+    if (savedSchedule.poleCode) {
+      assetCode = savedSchedule.poleCode;
+      assetTitle = `Pole ${savedSchedule.poleCode}`;
+    } else if (savedSchedule.parkCode) {
+      assetCode = savedSchedule.parkCode;
+      assetTitle = `Park ${savedSchedule.parkCode}`;
+    } else if (savedSchedule.parkingLotCode) {
+      assetCode = savedSchedule.parkingLotCode;
+      assetTitle = `Parking Lot ${savedSchedule.parkingLotCode}`;
+    } else if (savedSchedule.museumCode) {
+      assetCode = savedSchedule.museumCode;
+      assetTitle = `Museum ${savedSchedule.museumCode}`;
+    } else if (savedSchedule.publicToiletCode) {
+      assetCode = savedSchedule.publicToiletCode;
+      assetTitle = `Public Toilet ${savedSchedule.publicToiletCode}`;
+    } else if (savedSchedule.footballFieldCode) {
+      assetCode = savedSchedule.footballFieldCode;
+      assetTitle = `Football Field ${savedSchedule.footballFieldCode}`;
+    } else if (savedSchedule.riverSideProjectCode) {
+      assetCode = savedSchedule.riverSideProjectCode;
+      assetTitle = `River Side Project ${savedSchedule.riverSideProjectCode}`;
+    }
+
+    await this.notificationsService.notifyMaintenanceCreated(
+      savedSchedule.id,
+      assetTitle,
+      assetCode,
+    );
+
+    return savedSchedule;
   }
 
-  async findAllSchedules(type?: string) {
+  async findAllSchedules(queryDto: QueryMaintenanceDto = {}) {
+    const { page = 1, limit = 10, type, search, status } = queryDto;
+    const skip = (page - 1) * limit;
+
     const qb = this.schedulesRepository
       .createQueryBuilder('schedule')
       .leftJoinAndSelect('schedule.pole', 'pole')
@@ -270,7 +311,31 @@ export class MaintenanceService {
       }
     }
 
-    return qb.getMany();
+    // Filter by status
+    if (status) {
+      qb.andWhere('schedule.status = :status', { status });
+    }
+
+    // Search filter
+    if (search) {
+      qb.andWhere(
+        '(schedule.description ILIKE :search OR schedule.poleCode ILIKE :search OR schedule.parkCode ILIKE :search OR schedule.parkingLotCode ILIKE :search OR schedule.museumCode ILIKE :search OR schedule.publicToiletCode ILIKE :search OR schedule.footballFieldCode ILIKE :search OR schedule.riverSideProjectCode ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // Get paginated results
+    const [items, total] = await qb
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      page,
+      limit,
+      total,
+      items,
+    };
   }
 
   async findOneSchedule(id: string) {
@@ -360,7 +425,7 @@ export class MaintenanceService {
         });
       }
       if (saved.poleCode) {
-        await this.polesService.update(saved.poleCode, { status: PoleStatus.ACTIVE });
+        await this.polesService.update(saved.poleCode, { status: PoleStatus.OPERATIONAL });
       }
       if (saved.parkCode) {
         await this.parksService.update(saved.parkCode, { status: ParkStatus.ACTIVE });

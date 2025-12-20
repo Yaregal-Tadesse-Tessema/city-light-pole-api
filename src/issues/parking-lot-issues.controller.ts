@@ -23,6 +23,7 @@ import { UserRole } from '../users/entities/user.entity';
 import { ParkingLotIssuesService } from './parking-lot-issues.service';
 import { CreateParkingLotIssueDto } from './dto/create-parking-lot-issue.dto';
 import { UpdateIssueStatusDto } from './dto/update-issue-status.dto';
+import { PoleIssueAttachment } from './entities/pole-issue-attachment.entity';
 
 @ApiTags('Parking Lot Issues')
 @ApiBearerAuth()
@@ -35,28 +36,27 @@ export class ParkingLotIssuesController {
   @Roles(UserRole.ADMIN, UserRole.MAINTENANCE_ENGINEER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Create a new parking lot issue' })
-  create(@Body() dto: CreateParkingLotIssueDto, @CurrentUser() user: any) {
-    return this.service.create(dto, user.userId);
+  async create(@Body() dto: CreateParkingLotIssueDto, @CurrentUser() user: any) {
+    return await this.service.create(dto, user.userId);
   }
-
   @Get()
   @ApiOperation({ summary: 'Get all parking lot issues' })
-  findAll() {
-    return this.service.findAll();
+  async findAll() {
+    return await this.service.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a parking lot issue by ID' })
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  async findOne(@Param('id') id: string) {
+    return await this.service.findOne(id);
   }
 
   @Patch(':id/status')
   @Roles(UserRole.ADMIN, UserRole.MAINTENANCE_ENGINEER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update parking lot issue status' })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateIssueStatusDto) {
-    return this.service.updateStatus(id, dto);
+  async updateStatus(@Param('id') id: string, @Body() dto: UpdateIssueStatusDto) {
+    return await this.service.updateStatus(id, dto);
   }
 
   @Delete(':id')
@@ -83,7 +83,7 @@ export class ParkingLotIssuesController {
     },
   })
   @ApiOperation({ summary: 'Upload attachment to a parking lot issue' })
-  addAttachment(
+  async addAttachment(
     @Param('id') id: string,
     @UploadedFile(
       new ParseFilePipe({
@@ -95,8 +95,8 @@ export class ParkingLotIssuesController {
     )
     file: Express.Multer.File,
     @Body('type') type: string,
-  ) {
-    return this.service.addAttachment(id, file, type);
+  ): Promise<any> {
+    return await this.service.addAttachment(id, file, type);
   }
 }
 

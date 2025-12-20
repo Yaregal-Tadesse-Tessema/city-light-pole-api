@@ -9,10 +9,9 @@ import {
 import { PoleIssue } from '../../issues/entities/pole-issue.entity';
 
 export enum PoleStatus {
-  ACTIVE = 'ACTIVE',
+  OPERATIONAL = 'OPERATIONAL',
   FAULT_DAMAGED = 'FAULT_DAMAGED',
   UNDER_MAINTENANCE = 'UNDER_MAINTENANCE',
-  OPERATIONAL = 'OPERATIONAL',
 }
 
 export enum PoleType {
@@ -26,6 +25,12 @@ export enum LampType {
   FLUORESCENT = 'FLUORESCENT',
   SODIUM = 'SODIUM',
   HALOGEN = 'HALOGEN',
+}
+
+export enum LedStatus {
+  OPERATIONAL = 'OPERATIONAL',
+  ON_MAINTENANCE = 'ON_MAINTENANCE',
+  FAILED_DAMAGED = 'FAILED_DAMAGED',
 }
 
 export enum Subcity {
@@ -50,9 +55,9 @@ export class LightPole {
   @Column({
     type: 'enum',
     enum: Subcity,
-    name: 'subcity', // Database column name is 'district' for backward compatibility
+    name: 'subcity',
   })
-  subcity: string; // Property name - API will return this as 'district'
+  subcity: string;
 
   @Column()
   street: string;
@@ -89,6 +94,34 @@ export class LightPole {
   @Column({ nullable: true })
   ledModel: string;
 
+  @Column({ type: 'date', nullable: true })
+  ledInstallationDate: Date | null;
+
+  @Column({
+    type: 'enum',
+    enum: LedStatus,
+    nullable: true,
+  })
+  ledStatus: LedStatus | null;
+
+  @Column({ type: 'int', nullable: true })
+  numberOfPoles: number | null;
+
+  @Column({ default: false })
+  hasCamera: boolean;
+
+  @Column({ type: 'date', nullable: true })
+  cameraInstallationDate: Date | null;
+
+  @Column({ default: false })
+  hasPhoneCharger: boolean;
+
+  @Column({ type: 'date', nullable: true })
+  phoneChargerInstallationDate: Date | null;
+
+  @Column({ type: 'date', nullable: true })
+  poleInstallationDate: Date | null;
+
   @Column({ type: 'text', nullable: true })
   qrPayload: string;
 
@@ -98,7 +131,7 @@ export class LightPole {
   @Column({
     type: 'enum',
     enum: PoleStatus,
-    default: PoleStatus.ACTIVE,
+    default: PoleStatus.OPERATIONAL,
   })
   status: PoleStatus;
 

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsArray, IsUrl } from 'class-validator';
 import { IssueSeverity } from '../entities/pole-issue.entity';
 
 export class CreateIssueDto {
@@ -15,6 +15,12 @@ export class CreateIssueDto {
   @IsEnum(IssueSeverity)
   @IsOptional()
   severity?: IssueSeverity;
+
+  @ApiProperty({ required: false, type: [String], description: 'Array of uploaded file URLs' })
+  @IsOptional()
+  @IsArray()
+  @IsUrl({}, { each: true })
+  attachments?: string[];
 }
 
 

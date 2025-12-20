@@ -41,14 +41,14 @@ export class PolesService {
     // Only include GPS coordinates if they are provided
     const poleData: any = {
       code: createPoleDto.code,
-      district: createPoleDto.district,
+      subcity: createPoleDto.subcity,
       street: createPoleDto.street,
       heightMeters: createPoleDto.heightMeters,
       powerRatingWatt: createPoleDto.powerRatingWatt,
       poleType: createPoleDto.poleType || 'STANDARD',
       lampType: createPoleDto.lampType || 'LED',
       hasLedDisplay: createPoleDto.hasLedDisplay || false,
-      status: createPoleDto.status || PoleStatus.ACTIVE,
+      status: createPoleDto.status || PoleStatus.OPERATIONAL,
     };
 
     // Add GPS coordinates only if provided
@@ -59,9 +59,33 @@ export class PolesService {
       poleData.gpsLng = createPoleDto.gpsLng;
     }
 
-    // Add LED model only if hasLedDisplay is true
-    if (createPoleDto.hasLedDisplay && createPoleDto.ledModel) {
-      poleData.ledModel = createPoleDto.ledModel;
+    // Add LED fields only if hasLedDisplay is true
+    if (createPoleDto.hasLedDisplay) {
+      if (createPoleDto.ledModel) {
+        poleData.ledModel = createPoleDto.ledModel;
+      }
+      if (createPoleDto.ledInstallationDate) {
+        poleData.ledInstallationDate = new Date(createPoleDto.ledInstallationDate);
+      }
+      if (createPoleDto.ledStatus) {
+        poleData.ledStatus = createPoleDto.ledStatus;
+      }
+    }
+
+    // Add new fields
+    if (createPoleDto.numberOfPoles !== undefined) {
+      poleData.numberOfPoles = createPoleDto.numberOfPoles;
+    }
+    poleData.hasCamera = createPoleDto.hasCamera || false;
+    if (createPoleDto.hasCamera && createPoleDto.cameraInstallationDate) {
+      poleData.cameraInstallationDate = new Date(createPoleDto.cameraInstallationDate);
+    }
+    poleData.hasPhoneCharger = createPoleDto.hasPhoneCharger || false;
+    if (createPoleDto.hasPhoneCharger && createPoleDto.phoneChargerInstallationDate) {
+      poleData.phoneChargerInstallationDate = new Date(createPoleDto.phoneChargerInstallationDate);
+    }
+    if (createPoleDto.poleInstallationDate) {
+      poleData.poleInstallationDate = new Date(createPoleDto.poleInstallationDate);
     }
 
     const pole = this.polesRepository.create(poleData);
@@ -71,30 +95,46 @@ export class PolesService {
   }
 
   async findAll(queryDto: QueryPolesDto) {
-    const { page = 1, limit = 10, district, status, search } = queryDto;
+    const { page = 1, limit = 10, subcity, status, search, street, hasLedDisplay, sortBy, sortDirection } = queryDto;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.polesRepository.createQueryBuilder('pole');
 
-    if (district) {
-      queryBuilder.andWhere('pole.district = :district', { district });
+    if (subcity) {
+      queryBuilder.andWhere('pole.subcity = :subcity', { subcity });
     }
 
     if (status) {
       queryBuilder.andWhere('pole.status = :status', { status });
     }
 
+    if (street) {
+      queryBuilder.andWhere('pole.street = :street', { street });
+    }
+
+    if (hasLedDisplay !== undefined && hasLedDisplay !== null) {
+      // Handle string from query params
+      const hasLedDisplayBool = hasLedDisplay === 'true' || hasLedDisplay === '1';
+      queryBuilder.andWhere('pole.hasLedDisplay = :hasLedDisplay', { hasLedDisplay: hasLedDisplayBool });
+    }
+
     if (search) {
       queryBuilder.andWhere(
-        '(pole.code ILIKE :search OR pole.street ILIKE :search OR pole.district ILIKE :search)',
+        '(pole.code ILIKE :search OR pole.street ILIKE :search OR pole.subcity ILIKE :search)',
         { search: `%${search}%` },
       );
+    }
+
+    // Apply sorting
+    if (sortBy && sortDirection) {
+      queryBuilder.orderBy(`pole.${sortBy}`, sortDirection.toUpperCase() as 'ASC' | 'DESC');
+    } else {
+      queryBuilder.orderBy('pole.createdAt', 'DESC');
     }
 
     const [items, total] = await queryBuilder
       .skip(skip)
       .take(limit)
-      .orderBy('pole.createdAt', 'DESC')
       .getManyAndCount();
 
     return {
@@ -178,17 +218,16 @@ export class PolesService {
 
   async generateQR(code: string): Promise<LightPole> {
     const pole = await this.findOneByCode(code);
+    const frontendBaseUrl = this.configService.get<string>('FRONTEND_BASE_URL', 'http://localhost:5173');
     const publicBaseUrl = this.configService.get<string>('PUBLIC_BASE_URL');
     const uploadDir = this.configService.get<string>('UPLOAD_DIR', './uploads');
 
     // Create uploads directory if it doesn't exist
     await fs.mkdir(path.join(uploadDir, 'qr'), { recursive: true });
 
-    // Generate QR payload
-    const qrPayload = JSON.stringify({
-      code: pole.code,
-      publicUrl: `${publicBaseUrl}/api/v1/poles/${pole.code}`,
-    });
+    // Generate QR payload - store the frontend URL directly
+    const frontendUrl = `${frontendBaseUrl}/poles/${pole.code}`;
+    const qrPayload = frontendUrl; // Store just the URL, not JSON
 
     // Generate QR code image
     const qrFileName = `qr-${pole.code}-${Date.now()}.png`;
@@ -227,10 +266,10 @@ export class PolesService {
     const poles = await this.polesRepository
       .createQueryBuilder('pole')
       .innerJoin('pole.issues', 'issue')
-      .where('pole.district = :subcity', { subcity })
+      .where('pole.subcity = :subcity', { subcity })
       .select([
         'pole.code',
-        'pole.district',
+        'pole.subcity',
         'pole.street',
         'pole.status',
         'pole.gpsLat',

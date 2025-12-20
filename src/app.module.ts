@@ -17,6 +17,7 @@ import { RiverSideProjectsModule } from './river-side-projects/river-side-projec
 import { IssuesModule } from './issues/issues.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { ReportsModule } from './reports/reports.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { User } from './users/entities/user.entity';
 import { LightPole } from './poles/entities/light-pole.entity';
 import { PublicPark } from './parks/entities/public-park.entity';
@@ -44,6 +45,20 @@ import { MuseumMaintenance } from './museums/entities/museum-maintenance.entity'
 import { PublicToiletMaintenance } from './public-toilets/entities/public-toilet-maintenance.entity';
 import { FootballFieldMaintenance } from './football-fields/entities/football-field-maintenance.entity';
 import { RiverSideProjectMaintenance } from './river-side-projects/entities/river-side-project-maintenance.entity';
+import { InventoryItem } from './inventory/entities/inventory-item.entity';
+import { InventoryTransaction } from './inventory/entities/inventory-transaction.entity';
+import { Category } from './inventory/entities/category.entity';
+import { MaterialRequest } from './inventory/entities/material-request.entity';
+import { MaterialRequestItem } from './inventory/entities/material-request-item.entity';
+import { PurchaseRequest } from './inventory/entities/purchase-request.entity';
+import { PurchaseRequestItem } from './inventory/entities/purchase-request-item.entity';
+import { EmailModule } from './email/email.module';
+import { FileModule } from './file/file.module';
+import { RolesModule } from './roles/roles.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { Role } from './roles/entities/role.entity';
+import { UserRole } from './roles/entities/user-role.entity';
+import { Notification } from './notifications/entities/notification.entity';
 
 @Module({
   imports: [
@@ -93,6 +108,16 @@ import { RiverSideProjectMaintenance } from './river-side-projects/entities/rive
               PublicToiletMaintenance,
               FootballFieldMaintenance,
               RiverSideProjectMaintenance,
+              InventoryItem,
+              InventoryTransaction,
+              Category,
+              MaterialRequest,
+              MaterialRequestItem,
+              PurchaseRequest,
+              PurchaseRequestItem,
+              Role,
+              UserRole,
+              Notification,
             ],
             synchronize: configService.get('NODE_ENV') === 'development',
             logging: configService.get('NODE_ENV') === 'development',
@@ -132,6 +157,16 @@ import { RiverSideProjectMaintenance } from './river-side-projects/entities/rive
             RiverSideProjectIssue,
             MaintenanceSchedule,
             MaintenanceAttachment,
+              InventoryItem,
+              InventoryTransaction,
+              Category,
+              MaterialRequest,
+              MaterialRequestItem,
+              PurchaseRequest,
+              PurchaseRequestItem,
+              Role,
+              UserRole,
+              Notification,
           ],
           synchronize:true,
           logging: true,
@@ -164,6 +199,11 @@ import { RiverSideProjectMaintenance } from './river-side-projects/entities/rive
     IssuesModule,
     MaintenanceModule,
     ReportsModule,
+    InventoryModule,
+    RolesModule,
+    NotificationsModule,
+    EmailModule,
+    FileModule,
   ],
   controllers: [AppController],
   providers: [AppService],

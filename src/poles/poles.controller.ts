@@ -37,13 +37,17 @@ export class PolesController {
   @Get()
   @ApiOperation({ 
     summary: 'Get all light poles with filters',
-    description: 'Returns paginated list of light poles. Supports filtering by district, status, and search query.',
+    description: 'Returns paginated list of light poles. Supports filtering by subcity, status, and search query.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10)' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search in code, district, or street' })
-  @ApiQuery({ name: 'district', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'FAULT_DAMAGED', 'UNDER_MAINTENANCE', 'OPERATIONAL'] })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search in code, subcity, or street' })
+  @ApiQuery({ name: 'subcity', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['OPERATIONAL', 'FAULT_DAMAGED', 'UNDER_MAINTENANCE'] })
+  @ApiQuery({ name: 'street', required: false, type: String, description: 'Filter by exact street name' })
+  @ApiQuery({ name: 'hasLedDisplay', required: false, type: Boolean, description: 'Filter by LED display presence' })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['subcity', 'street'], description: 'Field to sort by' })
+  @ApiQuery({ name: 'sortDirection', required: false, enum: ['asc', 'desc'], description: 'Sort direction' })
   async findAll(@Query() queryDto: QueryPolesDto) {
     return await this.polesService.findAll(queryDto);
   }
