@@ -168,8 +168,8 @@ import { Notification } from './notifications/entities/notification.entity';
               UserRole,
               Notification,
           ],
-          synchronize:true,
-          logging: true,
+          synchronize: configService.get('NODE_ENV') === 'development',
+          logging: configService.get('NODE_ENV') === 'development',
         };
       },
       inject: [ConfigService],

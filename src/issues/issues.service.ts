@@ -102,7 +102,7 @@ export class IssuesService {
   }
 
   async findAll(queryDto: QueryIssuesDto = {}) {
-    const { page = 1, limit = 10, search, status, severity } = queryDto;
+    const { page = 1, limit = 10, search, status, severity, poleCode, createdAtFrom, createdAtTo, updatedAtFrom, updatedAtTo, sortBy, sortOrder } = queryDto;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.issuesRepository.createQueryBuilder('issue')
@@ -119,6 +119,26 @@ export class IssuesService {
       queryBuilder.andWhere('issue.severity = :severity', { severity });
     }
 
+    if (poleCode) {
+      queryBuilder.andWhere('issue.poleCode ILIKE :poleCode', { poleCode: `%${poleCode}%` });
+    }
+
+    if (createdAtFrom) {
+      queryBuilder.andWhere('issue.createdAt >= :createdAtFrom', { createdAtFrom });
+    }
+
+    if (createdAtTo) {
+      queryBuilder.andWhere('issue.createdAt <= :createdAtTo', { createdAtTo });
+    }
+
+    if (updatedAtFrom) {
+      queryBuilder.andWhere('issue.updatedAt >= :updatedAtFrom', { updatedAtFrom });
+    }
+
+    if (updatedAtTo) {
+      queryBuilder.andWhere('issue.updatedAt <= :updatedAtTo', { updatedAtTo });
+    }
+
     if (search) {
       queryBuilder.andWhere(
         '(issue.description ILIKE :search OR issue.poleCode ILIKE :search OR pole.street ILIKE :search)',
@@ -127,7 +147,31 @@ export class IssuesService {
     }
 
     // Apply ordering
-    queryBuilder.orderBy('issue.createdAt', 'DESC');
+    const sortField = sortBy || 'createdAt';
+    const sortDirection = sortOrder || 'DESC';
+
+    // Handle sorting with proper joins for related fields
+    if (sortField === 'reportedBy') {
+      queryBuilder.orderBy('reportedBy.fullName', sortDirection);
+    } else {
+      // Map frontend field names to database column names
+      const fieldMapping: { [key: string]: string } = {
+        poleCode: 'issue.poleCode',
+        description: 'issue.description',
+        status: 'issue.status',
+        severity: 'issue.severity',
+        createdAt: 'issue.createdAt',
+        updatedAt: 'issue.updatedAt',
+      };
+
+      const dbField = fieldMapping[sortField];
+      if (dbField) {
+        queryBuilder.orderBy(dbField, sortDirection);
+      } else {
+        // Default sort
+        queryBuilder.orderBy('issue.createdAt', 'DESC');
+      }
+    }
 
     // Get paginated results
     const [items, total] = await queryBuilder

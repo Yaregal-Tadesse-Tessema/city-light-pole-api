@@ -289,6 +289,10 @@ export class MaintenanceService {
       .leftJoinAndSelect('schedule.riverSideProject', 'riverSideProject')
       .leftJoinAndSelect('schedule.performedBy', 'performedBy')
       .leftJoinAndSelect('schedule.attachments', 'attachments')
+      .leftJoinAndSelect('schedule.materialRequests', 'materialRequests')
+      .leftJoinAndSelect('materialRequests.requestedBy', 'materialRequestRequestedBy')
+      .leftJoinAndSelect('materialRequests.approvedBy', 'materialRequestApprovedBy')
+      .leftJoinAndSelect('materialRequests.deliveredBy', 'materialRequestDeliveredBy')
       .orderBy('schedule.createdAt', 'DESC');
 
     // Filter by asset type (derived from which code column is set)

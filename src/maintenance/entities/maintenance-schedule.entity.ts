@@ -13,6 +13,7 @@ import { LightPole } from '../../poles/entities/light-pole.entity';
 import { PublicPark } from '../../parks/entities/public-park.entity';
 import { ParkingLot } from '../../parking-lots/entities/parking-lot.entity';
 import { Museum } from '../../museums/entities/museum.entity';
+import { MaterialRequest } from '../../inventory/entities/material-request.entity';
 import { PublicToilet } from '../../public-toilets/entities/public-toilet.entity';
 import { FootballField } from '../../football-fields/entities/football-field.entity';
 import { RiverSideProject } from '../../river-side-projects/entities/river-side-project.entity';
@@ -95,6 +96,9 @@ export class MaintenanceSchedule {
   @Column('date')
   startDate: Date;
 
+  @Column('timestamp', { nullable: true })
+  startedAt: Date;
+
   @Column('date', { nullable: true })
   endDate: Date;
 
@@ -131,6 +135,9 @@ export class MaintenanceSchedule {
     cascade: true,
   })
   attachments: MaintenanceAttachment[];
+
+  @OneToMany(() => MaterialRequest, (materialRequest) => materialRequest.maintenanceSchedule)
+  materialRequests: MaterialRequest[];
 
   @CreateDateColumn()
   createdAt: Date;

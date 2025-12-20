@@ -12,4 +12,11 @@ export class ApproveMaterialRequestDto {
   approve: boolean;
 }
 
+export class ReceiveMaterialRequestDto {
+  @ApiProperty({ required: false, description: 'Delivery notes' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 

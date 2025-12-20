@@ -53,6 +53,21 @@ export class MaintenanceController {
     return this.maintenanceService.findAllSchedules(queryDto);
   }
 
+  @Get('test')
+  @ApiOperation({ summary: 'Test endpoint' })
+  async test() {
+    return { message: 'Maintenance controller is working' };
+  }
+
+  @Get('schedules/:id')
+  @ApiOperation({ summary: 'Get a maintenance schedule by ID' })
+  async findOneSchedule(@Param('id') id: string) {
+    console.log('Finding maintenance schedule with ID:', id);
+    const result = await this.maintenanceService.findOneSchedule(id);
+    console.log('Found maintenance schedule:', result ? 'YES' : 'NO');
+    return result;
+  }
+
   @Patch('schedules/:id')
   @ApiOperation({ summary: 'Update a maintenance schedule' })
   async updateSchedule(

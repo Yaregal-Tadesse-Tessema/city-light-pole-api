@@ -15,7 +15,9 @@ import { PurchaseRequest } from './purchase-request.entity';
 
 export enum MaterialRequestStatus {
   PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
+  APPROVED = 'APPROVED', // Keep temporarily for migration
+  AWAITING_DELIVERY = 'AWAITING_DELIVERY',
+  DELIVERED = 'DELIVERED',
   REJECTED = 'REJECTED',
   FULFILLED = 'FULFILLED',
 }
@@ -58,6 +60,16 @@ export class MaterialRequest {
 
   @Column({ type: 'timestamp', nullable: true })
   approvedAt: Date | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'deliveredById' })
+  deliveredBy: User | null;
+
+  @Column({ nullable: true })
+  deliveredById: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  deliveredAt: Date | null;
 
   @Column({ type: 'text', nullable: true })
   rejectionReason: string | null;

@@ -14,7 +14,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { MaterialRequestService } from './material-request.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMaterialRequestDto } from './dto/create-material-request.dto';
-import { ApproveMaterialRequestDto } from './dto/approve-material-request.dto';
+import { ApproveMaterialRequestDto, ReceiveMaterialRequestDto } from './dto/approve-material-request.dto';
 import { MaterialRequestStatus } from './entities/material-request.entity';
 
 @ApiTags('Material Requests')
@@ -64,6 +64,16 @@ export class MaterialRequestController {
     @Request() req: any,
   ) {
     return this.materialRequestService.approve(id, approveDto, req.user.userId);
+  }
+
+  @Post(':id/receive')
+  @ApiOperation({ summary: 'Mark material request as received/delivered' })
+  async receive(
+    @Param('id') id: string,
+    @Body() receiveDto: ReceiveMaterialRequestDto,
+    @Request() req: any,
+  ) {
+    return this.materialRequestService.receive(id, receiveDto, req.user.userId);
   }
 
   @Patch(':id')

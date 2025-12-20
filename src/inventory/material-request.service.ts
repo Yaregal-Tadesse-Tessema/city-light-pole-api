@@ -11,7 +11,7 @@ import { InventoryItem } from './entities/inventory-item.entity';
 import { InventoryTransaction, TransactionType } from './entities/inventory-transaction.entity';
 import { MaintenanceSchedule, ScheduleStatus } from '../maintenance/entities/maintenance-schedule.entity';
 import { CreateMaterialRequestDto } from './dto/create-material-request.dto';
-import { ApproveMaterialRequestDto } from './dto/approve-material-request.dto';
+import { ApproveMaterialRequestDto, ReceiveMaterialRequestDto } from './dto/approve-material-request.dto';
 import { PurchaseRequest, PurchaseRequestStatus } from './entities/purchase-request.entity';
 import { PurchaseRequestItem } from './entities/purchase-request-item.entity';
 
@@ -47,16 +47,8 @@ export class MaterialRequestService {
       );
     }
 
-    // Check if material request already exists for this maintenance
-    const existing = await this.materialRequestRepository.findOne({
-      where: { maintenanceScheduleId: createDto.maintenanceScheduleId },
-    });
-
-    if (existing) {
-      throw new BadRequestException(
-        `Material request already exists for maintenance schedule ${createDto.maintenanceScheduleId}`,
-      );
-    }
+    // Allow multiple material requests per maintenance schedule
+    // (Comment out the restriction to allow multiple requests for the same maintenance)
 
     // Check availability and create request items
     const requestItems: MaterialRequestItem[] = [];
@@ -154,8 +146,18 @@ export class MaterialRequestService {
   async approve(id: string, approveDto: ApproveMaterialRequestDto, userId: string) {
     const request = await this.findOne(id);
 
-    if (request.status !== MaterialRequestStatus.PENDING) {
-      throw new BadRequestException(`Material request is not in PENDING status`);
+    // Allow approving PENDING requests, or re-approving APPROVED ones for backward compatibility
+    if (request.status !== MaterialRequestStatus.PENDING && request.status !== MaterialRequestStatus.APPROVED) {
+      throw new BadRequestException(`Material request must be in PENDING or APPROVED status to be approved`);
+    }
+
+    // Handle legacy APPROVED status (treat as already approved)
+    if (request.status === MaterialRequestStatus.APPROVED) {
+      request.status = MaterialRequestStatus.AWAITING_DELIVERY;
+      request.approvedById = userId;
+      request.approvedAt = new Date();
+      await this.materialRequestRepository.save(request);
+      return this.findOne(id);
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -165,7 +167,7 @@ export class MaterialRequestService {
     try {
       if (approveDto.approve) {
         // Approve the request
-        request.status = MaterialRequestStatus.APPROVED;
+        request.status = MaterialRequestStatus.AWAITING_DELIVERY;
         request.approvedById = userId;
         request.approvedAt = new Date();
         await queryRunner.manager.save(request);
@@ -256,15 +258,7 @@ export class MaterialRequestService {
           await queryRunner.manager.save(purchaseRequest);
         }
 
-        // Update maintenance schedule status to STARTED
-        const maintenance = await queryRunner.manager.findOne(MaintenanceSchedule, {
-          where: { id: request.maintenanceScheduleId },
-        });
-
-        if (maintenance) {
-          maintenance.status = ScheduleStatus.STARTED;
-          await queryRunner.manager.save(maintenance);
-        }
+        // Note: Maintenance schedule status will be updated when materials are delivered
 
         await queryRunner.commitTransaction();
       } else {
@@ -301,8 +295,8 @@ export class MaterialRequestService {
     }
 
     // Update allowed fields
-    if (updateDto.description) {
-      request.description = updateDto.description;
+    if (updateDto.notes) {
+      request.notes = updateDto.notes;
     }
 
     // Update items if provided
@@ -325,11 +319,10 @@ export class MaterialRequestService {
 
         const requestItem = this.materialRequestItemRepository.create({
           inventoryItemCode: itemDto.itemCode,
-          requestedQuantity: itemDto.requestedQuantity,
+          requestedQuantity: itemDto.quantity,
           availableQuantity: item.currentStock,
           requestType,
           status: RequestItemStatus.PENDING,
-          notes: itemDto.notes,
         });
 
         items.push(requestItem);
@@ -354,6 +347,58 @@ export class MaterialRequestService {
 
     // Delete the request
     await this.materialRequestRepository.remove(request);
+  }
+
+  async receive(id: string, receiveDto: ReceiveMaterialRequestDto, userId: string): Promise<MaterialRequest> {
+    const request = await this.materialRequestRepository.findOne({
+      where: { id },
+      relations: ['maintenanceSchedule'],
+    });
+
+    if (!request) {
+      throw new NotFoundException(`Material request with ID ${id} not found`);
+    }
+
+    if (request.status !== MaterialRequestStatus.AWAITING_DELIVERY) {
+      throw new BadRequestException(`Material request must be in AWAITING_DELIVERY status to be received`);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Mark material request as delivered
+      request.status = MaterialRequestStatus.DELIVERED;
+      request.deliveredAt = new Date();
+      request.deliveredById = userId;
+      request.notes = receiveDto.notes || request.notes;
+      await queryRunner.manager.save(request);
+
+      // Check if all material requests for this maintenance are delivered
+      if (request.maintenanceSchedule) {
+        const allMaterialRequests = await queryRunner.manager.find(MaterialRequest, {
+          where: { maintenanceScheduleId: request.maintenanceScheduleId },
+        });
+
+        const allDelivered = allMaterialRequests.every(mr => mr.status === MaterialRequestStatus.DELIVERED);
+
+        // Only set maintenance status to STARTED if all material requests are delivered
+        if (allDelivered) {
+          request.maintenanceSchedule.status = ScheduleStatus.STARTED;
+          request.maintenanceSchedule.startedAt = new Date();
+          await queryRunner.manager.save(request.maintenanceSchedule);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async getByMaintenanceScheduleId(maintenanceScheduleId: string): Promise<MaterialRequest | null> {

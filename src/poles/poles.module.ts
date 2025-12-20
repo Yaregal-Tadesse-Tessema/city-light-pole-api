@@ -5,7 +5,6 @@ import { PolesController } from './poles.controller';
 import { LightPole } from './entities/light-pole.entity';
 import { PoleIssue } from '../issues/entities/pole-issue.entity';
 import { MaintenanceSchedule } from '../maintenance/entities/maintenance-schedule.entity';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([LightPole, PoleIssue, MaintenanceSchedule]),
@@ -15,5 +14,4 @@ import { MaintenanceSchedule } from '../maintenance/entities/maintenance-schedul
   exports: [PolesService],
 })
 export class PolesModule {}
-
 
