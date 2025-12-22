@@ -283,9 +283,21 @@ export class PurchaseRequestService {
       request.receivedAt = new Date();
       await queryRunner.manager.save(request);
 
-      // If linked to maintenance schedule, check if all related purchases are received
-      if (request.maintenanceScheduleId) {
-        await this.checkAndUpdateMaintenanceStatus(queryRunner, request.maintenanceScheduleId);
+      // If linked to maintenance schedule (directly or through material request), check if all related purchases are received
+      let maintenanceScheduleIdToCheck = request.maintenanceScheduleId;
+
+      // If not directly linked, check if linked through material request
+      if (!maintenanceScheduleIdToCheck && request.materialRequestId) {
+        const materialRequest = await queryRunner.manager.findOne(MaterialRequest, {
+          where: { id: request.materialRequestId },
+          select: ['maintenanceScheduleId'],
+        });
+        maintenanceScheduleIdToCheck = materialRequest?.maintenanceScheduleId;
+      }
+
+      if (maintenanceScheduleIdToCheck) {
+        console.log(`🔗 Purchase request linked to maintenance schedule: ${maintenanceScheduleIdToCheck}`);
+        await this.checkAndUpdateMaintenanceStatus(queryRunner, maintenanceScheduleIdToCheck);
       }
 
       // Send notification to purchase managers

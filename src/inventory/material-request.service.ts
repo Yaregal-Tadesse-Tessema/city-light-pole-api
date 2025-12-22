@@ -367,6 +367,32 @@ export class MaterialRequestService {
         await queryRunner.manager.save(request.maintenanceSchedule);
       }
 
+      // Also run the comprehensive check to ensure maintenance status is correct
+      // This handles cases where purchase requests were completed before materials were delivered
+      const allMaterialRequests = await queryRunner.manager.find(MaterialRequest, {
+        where: { maintenanceScheduleId: request.maintenanceScheduleId },
+      });
+
+      const allPurchaseRequests = await queryRunner.manager.find(PurchaseRequest, {
+        where: { maintenanceScheduleId: request.maintenanceScheduleId },
+      });
+
+      const allMaterialsCompleted = allMaterialRequests.every(mr =>
+        mr.status === MaterialRequestStatus.FULFILLED || mr.status === MaterialRequestStatus.DELIVERED
+      );
+
+      const allPurchasesCompleted = allPurchaseRequests.every(pr =>
+        pr.status === PurchaseRequestStatus.COMPLETED
+      );
+
+      if (allMaterialsCompleted && allPurchasesCompleted) {
+        request.maintenanceSchedule.status = ScheduleStatus.STARTED;
+        if (!request.maintenanceSchedule.startedAt) {
+          request.maintenanceSchedule.startedAt = new Date();
+        }
+        await queryRunner.manager.save(request.maintenanceSchedule);
+      }
+
       await queryRunner.commitTransaction();
       return this.findOne(id);
     } catch (error) {
