@@ -391,11 +391,12 @@ export class PurchaseRequestService {
 
     console.log(`📋 Found ${materialRequests.length} material requests and ${directPurchaseRequests.length} direct purchase requests`);
 
-    // Check if all material requests are fulfilled
+    // Check if all material requests are fulfilled (accept both DELIVERED and FULFILLED)
     let allMaterialRequestsFulfilled = true;
     for (const materialRequest of materialRequests) {
-      if (materialRequest.status !== MaterialRequestStatus.FULFILLED) {
-        console.log(`❌ Material request ${materialRequest.id} status: ${materialRequest.status} (not FULFILLED)`);
+      if (materialRequest.status !== MaterialRequestStatus.FULFILLED &&
+          materialRequest.status !== MaterialRequestStatus.DELIVERED) {
+        console.log(`❌ Material request ${materialRequest.id} status: ${materialRequest.status} (not FULFILLED or DELIVERED)`);
         allMaterialRequestsFulfilled = false;
         break;
       }
@@ -411,7 +412,7 @@ export class PurchaseRequestService {
       }
     }
 
-    console.log(`✅ Material requests fulfilled: ${allMaterialRequestsFulfilled}`);
+    console.log(`✅ Material requests completed (FULFILLED/DELIVERED): ${allMaterialRequestsFulfilled}`);
     console.log(`✅ Direct purchases completed: ${allDirectPurchasesCompleted}`);
 
     // If all material requests are fulfilled AND all direct purchase requests are completed
