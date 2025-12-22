@@ -11,6 +11,7 @@ import { InventoryItem } from './entities/inventory-item.entity';
 import { InventoryTransaction, TransactionType } from './entities/inventory-transaction.entity';
 import { MaterialRequest, MaterialRequestStatus } from './entities/material-request.entity';
 import { MaterialRequestItem, RequestItemStatus } from './entities/material-request-item.entity';
+import { MaintenanceSchedule, ScheduleStatus } from '../maintenance/entities/maintenance-schedule.entity';
 import { CreatePurchaseRequestDto } from './dto/create-purchase-request.dto';
 import { ApprovePurchaseRequestDto } from './dto/approve-purchase-request.dto';
 import { ReceivePurchaseRequestDto } from './dto/receive-purchase-request.dto';
@@ -131,10 +132,110 @@ export class PurchaseRequestService {
     return this.purchaseRequestRepository.save(request);
   }
 
+  async markReadyToDeliver(id: string, userId: string) {
+    const request = await this.findOne(id);
+
+    if (request.status !== PurchaseRequestStatus.APPROVED) {
+      throw new BadRequestException(`Purchase request must be APPROVED before marking as ready to deliver`);
+    }
+
+    request.status = PurchaseRequestStatus.READY_TO_DELIVER;
+    request.readyToDeliverAt = new Date();
+    request.readyToDeliverById = userId;
+
+    return this.purchaseRequestRepository.save(request);
+  }
+
+  async complete(id: string, userId: string) {
+    const request = await this.findOne(id);
+
+    if (request.status !== PurchaseRequestStatus.READY_TO_DELIVER) {
+      throw new BadRequestException(`Purchase request must be READY_TO_DELIVER before completing`);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Add items to inventory
+      for (const item of request.items) {
+        const inventoryItem = await queryRunner.manager.findOne(InventoryItem, {
+          where: { code: item.inventoryItemCode },
+        });
+
+        if (!inventoryItem) {
+          throw new NotFoundException(`Inventory item ${item.inventoryItemCode} not found`);
+        }
+
+        // Update stock
+        const stockBefore = Number(inventoryItem.currentStock);
+        const quantityToAdd = Number(item.requestedQuantity);
+        inventoryItem.currentStock = stockBefore + quantityToAdd;
+
+        await queryRunner.manager.save(inventoryItem);
+
+        // Create transaction record
+        const transaction = this.transactionRepository.create({
+          itemCode: item.inventoryItemCode,
+          type: TransactionType.PURCHASE,
+          quantity: quantityToAdd,
+          stockBefore,
+          stockAfter: stockBefore + quantityToAdd,
+          userId,
+          reference: `Purchase Request: ${request.id}`,
+          notes: `Completed purchase request delivery`,
+        });
+
+        await queryRunner.manager.save(transaction);
+      }
+
+      // Mark purchase request as completed
+      request.status = PurchaseRequestStatus.COMPLETED;
+      request.completedAt = new Date();
+      request.completedById = userId;
+      await queryRunner.manager.save(request);
+
+      // Check if maintenance should be marked as STARTED
+      if (request.maintenanceScheduleId) {
+        const maintenance = await queryRunner.manager.findOne(MaintenanceSchedule, {
+          where: { id: request.maintenanceScheduleId },
+          relations: ['materialRequests', 'purchaseRequests'],
+        });
+
+        if (maintenance) {
+          const allMaterialRequests = maintenance.materialRequests || [];
+          const allPurchaseRequests = maintenance.purchaseRequests || [];
+
+          const allMaterialsDelivered = allMaterialRequests.every(mr => mr.status === MaterialRequestStatus.DELIVERED);
+          const allPurchasesCompleted = allPurchaseRequests.every(pr =>
+          pr.status === PurchaseRequestStatus.COMPLETED || pr.status === PurchaseRequestStatus.RECEIVED
+        );
+
+          if (allMaterialsDelivered && allPurchasesCompleted) {
+            maintenance.status = ScheduleStatus.STARTED;
+            if (!maintenance.startedAt) {
+              maintenance.startedAt = new Date();
+            }
+            await queryRunner.manager.save(maintenance);
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async receive(id: string, receiveDto: ReceivePurchaseRequestDto, userId: string) {
     const request = await this.findOne(id);
 
-    if (request.status !== PurchaseRequestStatus.APPROVED && request.status !== PurchaseRequestStatus.ORDERED) {
+    if (request.status !== PurchaseRequestStatus.APPROVED && request.status !== PurchaseRequestStatus.READY_TO_DELIVER) {
       throw new BadRequestException(
         `Purchase request must be APPROVED or ORDERED before receiving. Current status: ${request.status}`,
       );
@@ -156,17 +257,18 @@ export class PurchaseRequestService {
         }
 
         // Update stock
-        const stockBefore = inventoryItem.currentStock;
-        inventoryItem.currentStock = stockBefore + item.requestedQuantity;
+        const stockBefore = Number(inventoryItem.currentStock);
+        const quantityToAdd = Number(item.requestedQuantity);
+        inventoryItem.currentStock = stockBefore + quantityToAdd;
         await queryRunner.manager.save(inventoryItem);
 
         // Create transaction
         const transaction = queryRunner.manager.create(InventoryTransaction, {
           itemCode: item.inventoryItemCode,
           type: TransactionType.PURCHASE,
-          quantity: item.requestedQuantity,
+          quantity: quantityToAdd,
           stockBefore,
-          stockAfter: inventoryItem.currentStock,
+          stockAfter: stockBefore + quantityToAdd,
           userId,
           reference: `PURCHASE-${request.id}`,
           notes: receiveDto.notes || `Received from purchase request ${request.id}`,
@@ -175,7 +277,7 @@ export class PurchaseRequestService {
       }
 
       // Update purchase request status
-      request.status = PurchaseRequestStatus.RECEIVED;
+      request.status = PurchaseRequestStatus.COMPLETED;
       request.receivedAt = new Date();
       await queryRunner.manager.save(request);
 
@@ -239,7 +341,7 @@ export class PurchaseRequestService {
       throw new BadRequestException(`Purchase request must be APPROVED before marking as ORDERED`);
     }
 
-    request.status = PurchaseRequestStatus.ORDERED;
+    request.status = PurchaseRequestStatus.APPROVED;
     request.orderedAt = new Date();
     return this.purchaseRequestRepository.save(request);
   }

@@ -257,17 +257,18 @@ export class MaterialRequestService {
             }
 
             // Update stock
-            const stockBefore = inventoryItem.currentStock;
-            inventoryItem.currentStock = stockBefore - item.requestedQuantity;
+            const stockBefore = Number(inventoryItem.currentStock);
+            const quantityToSubtract = Number(item.requestedQuantity);
+            inventoryItem.currentStock = stockBefore - quantityToSubtract;
             await queryRunner.manager.save(inventoryItem);
 
             // Create transaction
             const transaction = queryRunner.manager.create(InventoryTransaction, {
               itemCode: item.inventoryItemCode,
               type: TransactionType.USAGE,
-              quantity: item.requestedQuantity,
+              quantity: quantityToSubtract,
               stockBefore,
-              stockAfter: inventoryItem.currentStock,
+              stockAfter: stockBefore - quantityToSubtract,
               userId,
               reference: `MAINTENANCE-${request.maintenanceScheduleId}`,
               notes: `Used for maintenance schedule ${request.maintenanceScheduleId}`,
