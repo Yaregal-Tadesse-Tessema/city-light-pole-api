@@ -359,14 +359,23 @@ export class PurchaseRequestService {
   }
 
   private async checkAndUpdateMaintenanceStatus(queryRunner: any, maintenanceScheduleId: string) {
+    console.log(`🔍 Checking maintenance status update for schedule: ${maintenanceScheduleId}`);
+
     // Find the maintenance schedule
     const maintenanceSchedule = await queryRunner.manager.findOne(MaintenanceSchedule, {
       where: { id: maintenanceScheduleId },
     });
 
-    if (!maintenanceSchedule ||
-        maintenanceSchedule.status === ScheduleStatus.STARTED ||
+    if (!maintenanceSchedule) {
+      console.log(`❌ Maintenance schedule ${maintenanceScheduleId} not found`);
+      return;
+    }
+
+    console.log(`📊 Current maintenance status: ${maintenanceSchedule.status}`);
+
+    if (maintenanceSchedule.status === ScheduleStatus.STARTED ||
         maintenanceSchedule.status === ScheduleStatus.COMPLETED) {
+      console.log(`⏭️ Maintenance already ${maintenanceSchedule.status}, no update needed`);
       return; // Don't update if already started or completed
     }
 
@@ -380,10 +389,13 @@ export class PurchaseRequestService {
       where: { maintenanceScheduleId },
     });
 
+    console.log(`📋 Found ${materialRequests.length} material requests and ${directPurchaseRequests.length} direct purchase requests`);
+
     // Check if all material requests are fulfilled
     let allMaterialRequestsFulfilled = true;
     for (const materialRequest of materialRequests) {
       if (materialRequest.status !== MaterialRequestStatus.FULFILLED) {
+        console.log(`❌ Material request ${materialRequest.id} status: ${materialRequest.status} (not FULFILLED)`);
         allMaterialRequestsFulfilled = false;
         break;
       }
@@ -393,16 +405,24 @@ export class PurchaseRequestService {
     let allDirectPurchasesCompleted = true;
     for (const purchaseRequest of directPurchaseRequests) {
       if (purchaseRequest.status !== PurchaseRequestStatus.COMPLETED) {
+        console.log(`❌ Direct purchase request ${purchaseRequest.id} status: ${purchaseRequest.status} (not COMPLETED)`);
         allDirectPurchasesCompleted = false;
         break;
       }
     }
 
+    console.log(`✅ Material requests fulfilled: ${allMaterialRequestsFulfilled}`);
+    console.log(`✅ Direct purchases completed: ${allDirectPurchasesCompleted}`);
+
     // If all material requests are fulfilled AND all direct purchase requests are completed
     if (allMaterialRequestsFulfilled && allDirectPurchasesCompleted) {
+      console.log(`🚀 Updating maintenance status to STARTED`);
       maintenanceSchedule.status = ScheduleStatus.STARTED;
       maintenanceSchedule.startedAt = new Date();
       await queryRunner.manager.save(maintenanceSchedule);
+      console.log(`✅ Maintenance status updated successfully`);
+    } else {
+      console.log(`⏳ Not all requirements met, maintenance status remains ${maintenanceSchedule.status}`);
     }
   }
 }
