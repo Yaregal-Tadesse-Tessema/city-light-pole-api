@@ -58,14 +58,35 @@ export class PurchaseRequestController {
     return this.purchaseRequestService.markAsOrdered(id, req.user.userId);
   }
 
+  @Post(':id/ready-to-deliver')
+  @ApiOperation({ summary: 'Mark purchase request as ready to deliver' })
+  async markReadyToDeliver(@Param('id') id: string, @Request() req: any) {
+    return this.purchaseRequestService.markReadyToDeliver(id, req.user.userId);
+  }
+
+  @Post(':id/complete')
+  @ApiOperation({ summary: 'Mark purchase request as completed and add to inventory' })
+  async complete(@Param('id') id: string, @Request() req: any) {
+    return this.purchaseRequestService.complete(id, req.user.userId);
+  }
+
   @Post(':id/receive')
-  @ApiOperation({ summary: 'Mark purchase request as received and add to inventory' })
+  @ApiOperation({ summary: 'Mark purchase request as arrived in stock and add to inventory' })
   async receive(
     @Param('id') id: string,
     @Body() receiveDto: ReceivePurchaseRequestDto,
     @Request() req: any,
   ) {
     return this.purchaseRequestService.receive(id, receiveDto, req.user.userId);
+  }
+
+  @Post(':id/deliver')
+  @ApiOperation({ summary: 'Mark purchase request as delivered to maintenance team' })
+  async deliver(
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    return this.purchaseRequestService.deliver(id, req.user.userId);
   }
 }
 

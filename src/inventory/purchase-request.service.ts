@@ -192,8 +192,8 @@ export class PurchaseRequestService {
         await queryRunner.manager.save(transaction);
       }
 
-      // Mark purchase request as completed
-      request.status = PurchaseRequestStatus.COMPLETED;
+      // Mark purchase request as delivered
+      request.status = PurchaseRequestStatus.DELIVERED;
       request.completedAt = new Date();
       request.completedById = userId;
       await queryRunner.manager.save(request);
@@ -211,8 +211,8 @@ export class PurchaseRequestService {
 
           const allMaterialsDelivered = allMaterialRequests.every(mr => mr.status === MaterialRequestStatus.DELIVERED);
           const allPurchasesCompleted = allPurchaseRequests.every(pr =>
-          pr.status === PurchaseRequestStatus.COMPLETED || pr.status === PurchaseRequestStatus.RECEIVED
-        );
+            pr.status === PurchaseRequestStatus.DELIVERED
+          );
 
           if (allMaterialsDelivered && allPurchasesCompleted) {
             maintenance.status = ScheduleStatus.STARTED;
@@ -237,7 +237,7 @@ export class PurchaseRequestService {
   async receive(id: string, receiveDto: ReceivePurchaseRequestDto, userId: string) {
     const request = await this.findOne(id);
 
-    if (request.status !== PurchaseRequestStatus.APPROVED && request.status !== PurchaseRequestStatus.READY_TO_DELIVER) {
+    if (request.status !== PurchaseRequestStatus.APPROVED && request.status !== PurchaseRequestStatus.ORDERED) {
       throw new BadRequestException(
         `Purchase request must be APPROVED or ORDERED before receiving. Current status: ${request.status}`,
       );
@@ -279,7 +279,7 @@ export class PurchaseRequestService {
       }
 
       // Update purchase request status
-      request.status = PurchaseRequestStatus.COMPLETED;
+      request.status = PurchaseRequestStatus.ARRIVED_IN_STOCK;
       request.receivedAt = new Date();
       await queryRunner.manager.save(request);
 
@@ -365,9 +365,54 @@ export class PurchaseRequestService {
       throw new BadRequestException(`Purchase request must be APPROVED before marking as ORDERED`);
     }
 
-    request.status = PurchaseRequestStatus.APPROVED;
+    request.status = PurchaseRequestStatus.ORDERED;
     request.orderedAt = new Date();
     return this.purchaseRequestRepository.save(request);
+  }
+
+  async deliver(id: string, userId: string) {
+    const request = await this.findOne(id);
+
+    if (request.status !== PurchaseRequestStatus.ARRIVED_IN_STOCK) {
+      throw new BadRequestException(`Purchase request must be ARRIVED_IN_STOCK before delivering. Current status: ${request.status}`);
+    }
+
+    // Update status to DELIVERED
+    request.status = PurchaseRequestStatus.DELIVERED;
+    request.receivedAt = new Date(); // Reuse receivedAt for delivery timestamp
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await queryRunner.manager.save(request);
+
+      // Check if linked to maintenance schedule and update status
+      let maintenanceScheduleIdToCheck = request.maintenanceScheduleId;
+
+      // If not directly linked, check if linked through material request
+      if (!maintenanceScheduleIdToCheck && request.materialRequestId) {
+        const materialRequest = await queryRunner.manager.findOne(MaterialRequest, {
+          where: { id: request.materialRequestId },
+          select: ['maintenanceScheduleId'],
+        });
+        maintenanceScheduleIdToCheck = materialRequest?.maintenanceScheduleId;
+      }
+
+      if (maintenanceScheduleIdToCheck) {
+        console.log(`🔗 Purchase request delivered, checking maintenance schedule: ${maintenanceScheduleIdToCheck}`);
+        await this.checkAndUpdateMaintenanceStatus(queryRunner, maintenanceScheduleIdToCheck);
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private async checkAndUpdateMaintenanceStatus(queryRunner: any, maintenanceScheduleId: string) {
@@ -386,7 +431,8 @@ export class PurchaseRequestService {
     console.log(`📊 Current maintenance status: ${maintenanceSchedule.status}`);
 
     if (maintenanceSchedule.status === ScheduleStatus.STARTED ||
-        maintenanceSchedule.status === ScheduleStatus.COMPLETED) {
+        maintenanceSchedule.status === ScheduleStatus.COMPLETED ||
+        maintenanceSchedule.status === ScheduleStatus.STARTED) {
       console.log(`⏭️ Maintenance already ${maintenanceSchedule.status}, no update needed`);
       return; // Don't update if already started or completed
     }
@@ -417,8 +463,8 @@ export class PurchaseRequestService {
     // Check if all direct purchase requests are completed
     let allDirectPurchasesCompleted = true;
     for (const purchaseRequest of directPurchaseRequests) {
-      if (purchaseRequest.status !== PurchaseRequestStatus.COMPLETED) {
-        console.log(`❌ Direct purchase request ${purchaseRequest.id} status: ${purchaseRequest.status} (not COMPLETED)`);
+      if (purchaseRequest.status !== PurchaseRequestStatus.DELIVERED) {
+        console.log(`❌ Direct purchase request ${purchaseRequest.id} status: ${purchaseRequest.status} (not DELIVERED)`);
         allDirectPurchasesCompleted = false;
         break;
       }

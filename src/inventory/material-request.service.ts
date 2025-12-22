@@ -327,12 +327,12 @@ export class MaterialRequestService {
       where: { materialRequestId: id },
     });
 
-    const allPurchasesCompleted = purchaseRequests.every(pr => pr.status === PurchaseRequestStatus.COMPLETED);
+    const allPurchasesCompleted = purchaseRequests.every(pr => pr.status === PurchaseRequestStatus.DELIVERED);
 
     if (!allPurchasesCompleted) {
       throw new BadRequestException(
         `Cannot deliver materials: All purchase requests must be completed first. ` +
-        `Found ${purchaseRequests.filter(pr => pr.status !== PurchaseRequestStatus.COMPLETED).length} pending purchase requests.`
+        `Found ${purchaseRequests.filter(pr => pr.status !== PurchaseRequestStatus.DELIVERED).length} pending purchase requests.`
       );
     }
 
@@ -359,7 +359,7 @@ export class MaterialRequestService {
         });
 
         const allMaterialsDelivered = allMaterialRequests.every(mr => mr.status === MaterialRequestStatus.DELIVERED);
-        const allPurchasesCompleted = allPurchaseRequests.every(pr => pr.status === PurchaseRequestStatus.COMPLETED);
+        const allPurchasesCompleted = allPurchaseRequests.every(pr => pr.status === PurchaseRequestStatus.DELIVERED);
 
         // Set maintenance status based on completion state
         if (allMaterialsDelivered && allPurchasesCompleted) {
@@ -396,7 +396,7 @@ export class MaterialRequestService {
       );
 
       const allPurchasesCompleted = allPurchaseRequests.every(pr =>
-        pr.status === PurchaseRequestStatus.COMPLETED
+        pr.status === PurchaseRequestStatus.DELIVERED
       );
 
       if (allMaterialsCompleted && allPurchasesCompleted) {

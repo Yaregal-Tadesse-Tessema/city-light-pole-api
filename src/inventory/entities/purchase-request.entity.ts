@@ -11,13 +11,16 @@ import {
 import { MaterialRequest } from './material-request.entity';
 import { User } from '../../users/entities/user.entity';
 import { PurchaseRequestItem } from './purchase-request-item.entity';
+import { MaintenanceSchedule } from '../../maintenance/entities/maintenance-schedule.entity';
 
 export enum PurchaseRequestStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   ORDERED = 'ORDERED',
-  RECEIVED = 'RECEIVED',
+  ARRIVED_IN_STOCK = 'ARRIVED_IN_STOCK',
+  READY_TO_DELIVER = 'READY_TO_DELIVER',
+  DELIVERED = 'DELIVERED',
 }
 
 @Entity('purchase_requests')
@@ -38,6 +41,13 @@ export class PurchaseRequest {
 
   @Column()
   requestedById: string;
+
+  @ManyToOne(() => MaintenanceSchedule, { nullable: true })
+  @JoinColumn({ name: 'maintenanceScheduleId' })
+  maintenanceSchedule: MaintenanceSchedule | null;
+
+  @Column({ nullable: true })
+  maintenanceScheduleId: string | null;
 
   @Column({
     type: 'enum',
@@ -76,6 +86,26 @@ export class PurchaseRequest {
 
   @Column({ type: 'timestamp', nullable: true })
   receivedAt: Date | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'readyToDeliverById' })
+  readyToDeliverBy: User | null;
+
+  @Column({ nullable: true })
+  readyToDeliverById: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  readyToDeliverAt: Date | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'completedById' })
+  completedBy: User | null;
+
+  @Column({ nullable: true })
+  completedById: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt: Date | null;
 
   @OneToMany(() => PurchaseRequestItem, (item) => item.purchaseRequest, { cascade: true })
   items: PurchaseRequestItem[];
