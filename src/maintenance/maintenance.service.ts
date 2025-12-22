@@ -112,13 +112,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same pole
     if (createScheduleDto.poleCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           poleCode: createScheduleDto.poleCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this pole',
         );
@@ -127,13 +127,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same park
     if (createScheduleDto.parkCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           parkCode: createScheduleDto.parkCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this park',
         );
@@ -142,13 +142,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same parking lot
     if (createScheduleDto.parkingLotCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           parkingLotCode: createScheduleDto.parkingLotCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this parking lot',
         );
@@ -157,13 +157,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same museum
     if (createScheduleDto.museumCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           museumCode: createScheduleDto.museumCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this museum',
         );
@@ -172,13 +172,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same public toilet
     if (createScheduleDto.publicToiletCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           publicToiletCode: createScheduleDto.publicToiletCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this public toilet',
         );
@@ -187,13 +187,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same football field
     if (createScheduleDto.footballFieldCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           footballFieldCode: createScheduleDto.footballFieldCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this football field',
         );
@@ -202,13 +202,13 @@ export class MaintenanceService {
 
     // Prevent multiple active/requested/started schedules for the same river side project
     if (createScheduleDto.riverSideProjectCode) {
-      const existingActive = await this.schedulesRepository.findOne({
+      const existingActive = await this.schedulesRepository.find({
         where: {
           riverSideProjectCode: createScheduleDto.riverSideProjectCode,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingActive) {
+      if (existingActive && existingActive.length > 0) {
         throw new BadRequestException(
           'There is already an active/requested maintenance schedule for this river side project',
         );
@@ -217,15 +217,15 @@ export class MaintenanceService {
 
     // Prevent multiple uncompleted maintenance records for the same issue
     if (createScheduleDto.issueId) {
-      const existingUncompleted = await this.schedulesRepository.findOne({
+      const existingUncompleted = await this.schedulesRepository.find({
         where: {
           issueId: createScheduleDto.issueId,
           status: In([ScheduleStatus.REQUESTED, ScheduleStatus.STARTED, ScheduleStatus.PAUSED]),
         },
       });
-      if (existingUncompleted) {
+      if (existingUncompleted && existingUncompleted.length > 0) {
         throw new BadRequestException(
-          `Cannot create maintenance: There is already an uncompleted maintenance record (${existingUncompleted.status}) for this issue. Please complete or cancel the existing maintenance first.`,
+          `Cannot create maintenance: There is already an uncompleted maintenance record (${existingUncompleted[0].status}) for this issue. Please complete or cancel the existing maintenance first.`,
         );
       }
 
