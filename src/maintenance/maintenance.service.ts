@@ -236,6 +236,22 @@ export class MaintenanceService {
     }
 
     const schedule = this.schedulesRepository.create(createScheduleDto);
+
+    // Generate unique maintenance code
+    const lastSchedule = await this.schedulesRepository.findOne({
+      order: { createdAt: 'DESC' },
+    });
+
+    let nextNumber = 1;
+    if (lastSchedule?.maintenanceCode) {
+      const match = lastSchedule.maintenanceCode.match(/MNT-(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+
+    schedule.maintenanceCode = `MNT-${String(nextNumber).padStart(5, '0')}`;
+
     const savedSchedule = await this.schedulesRepository.save(schedule);
 
     // Send notification to maintenance managers
@@ -455,11 +471,43 @@ export class MaintenanceService {
   }
 
   async removeSchedule(id: string): Promise<void> {
-    const schedule = await this.findOneSchedule(id);
-    
+    const schedule = await this.schedulesRepository.findOne({
+      where: { id },
+      relations: ['attachments', 'materialRequests', 'purchaseRequests'],
+    });
+
+    if (!schedule) {
+      throw new NotFoundException('Maintenance schedule not found');
+    }
+
     // Only allow deletion of REQUESTED (draft) schedules
     if (schedule.status !== ScheduleStatus.REQUESTED) {
       throw new BadRequestException('Only REQUESTED maintenance schedules can be deleted');
+    }
+
+    // Check if schedule has active material requests
+    const activeMaterialRequests = schedule.materialRequests?.filter(
+      mr => mr.status !== 'FULFILLED'
+    ) || [];
+
+    // Check if schedule has active purchase requests
+    const activePurchaseRequests = schedule.purchaseRequests?.filter(
+      pr => !['COMPLETED', 'REJECTED'].includes(pr.status)
+    ) || [];
+
+    if (activeMaterialRequests.length > 0 || activePurchaseRequests.length > 0) {
+      const details = [];
+      if (activeMaterialRequests.length > 0) {
+        details.push(`${activeMaterialRequests.length} active material request(s)`);
+      }
+      if (activePurchaseRequests.length > 0) {
+        details.push(`${activePurchaseRequests.length} active purchase request(s)`);
+      }
+
+      throw new BadRequestException(
+        `Cannot delete maintenance schedule because it has ${details.join(' and ')}. ` +
+        'Please complete or cancel all related requests before deleting.'
+      );
     }
 
     // If linked to an issue, revert issue status back to REPORTED
@@ -478,7 +526,7 @@ export class MaintenanceService {
     if (schedule.attachments && schedule.attachments.length > 0) {
       const uploadDir = this.configService.get<string>('UPLOAD_DIR', './uploads');
       const publicBaseUrl = this.configService.get<string>('PUBLIC_BASE_URL', '');
-      
+
       for (const attachment of schedule.attachments) {
         try {
           // Extract relative path from full URL
