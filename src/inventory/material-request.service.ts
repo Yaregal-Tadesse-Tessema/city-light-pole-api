@@ -322,6 +322,20 @@ export class MaterialRequestService {
       throw new BadRequestException(`Material request must be in AWAITING_DELIVERY status to be received`);
     }
 
+    // Check if all purchase requests for this material request are completed
+    const purchaseRequests = await this.purchaseRequestRepository.find({
+      where: { materialRequestId: id },
+    });
+
+    const allPurchasesCompleted = purchaseRequests.every(pr => pr.status === PurchaseRequestStatus.COMPLETED);
+
+    if (!allPurchasesCompleted) {
+      throw new BadRequestException(
+        `Cannot deliver materials: All purchase requests must be completed first. ` +
+        `Found ${purchaseRequests.filter(pr => pr.status !== PurchaseRequestStatus.COMPLETED).length} pending purchase requests.`
+      );
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
