@@ -36,6 +36,8 @@ export class MaterialRequestService {
   ) {}
 
   async create(createDto: CreateMaterialRequestDto, userId: string): Promise<MaterialRequest> {
+    console.log('🔍 Creating material request with data:', JSON.stringify(createDto, null, 2));
+
     // Verify maintenance schedule exists
     const maintenance = await this.maintenanceRepository.findOne({
       where: { id: createDto.maintenanceScheduleId },
@@ -47,57 +49,114 @@ export class MaterialRequestService {
       );
     }
 
-    // Allow multiple material requests per maintenance schedule
-    // (Comment out the restriction to allow multiple requests for the same maintenance)
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // Check availability and create request items
-    const requestItems: MaterialRequestItem[] = [];
-    const purchaseItems: { item: InventoryItem; quantity: number; unitCost: number }[] = [];
+    try {
+      // Check availability and split requests
+      const materialRequestItems: MaterialRequestItem[] = [];
+      const purchaseRequestItems: { item: InventoryItem; quantity: number; unitCost: number }[] = [];
 
-    for (const itemDto of createDto.items) {
-      const item = await this.inventoryRepository.findOne({
-        where: { code: itemDto.itemCode },
-      });
+      for (const itemDto of createDto.items) {
+        console.log(`🔍 Looking up inventory item with code: "${itemDto.itemCode}"`);
 
-      if (!item) {
-        throw new NotFoundException(`Inventory item with code ${itemDto.itemCode} not found`);
-      }
-
-      const available = item.currentStock >= itemDto.quantity;
-      const requestType = available ? RequestItemType.USAGE : RequestItemType.PURCHASE;
-
-      const requestItem = this.materialRequestItemRepository.create({
-        inventoryItemCode: itemDto.itemCode,
-        requestedQuantity: itemDto.quantity,
-        availableQuantity: item.currentStock,
-        requestType,
-        status: RequestItemStatus.PENDING,
-      });
-
-      requestItems.push(requestItem);
-
-      // If not available, prepare for purchase request
-      if (!available) {
-        purchaseItems.push({
-          item,
-          quantity: itemDto.quantity,
-          unitCost: item.unitCost || 0,
+        const item = await queryRunner.manager.findOne(InventoryItem, {
+          where: { code: itemDto.itemCode },
         });
+
+        if (!item) {
+          console.error(`❌ Inventory item with code "${itemDto.itemCode}" not found`);
+          throw new NotFoundException(`Inventory item with code ${itemDto.itemCode} not found`);
+        }
+
+        console.log(`✅ Found inventory item: ${item.name} (${item.code})`);
+
+        // If we have stock available, create material request item for available quantity
+        if (item.currentStock > 0) {
+          const materialQuantity = Math.min(itemDto.quantity, item.currentStock);
+
+          const requestItem = this.materialRequestItemRepository.create({
+            inventoryItemCode: itemDto.itemCode,
+            requestedQuantity: materialQuantity,
+            availableQuantity: item.currentStock,
+            requestType: RequestItemType.USAGE,
+            status: RequestItemStatus.PENDING,
+          });
+
+          materialRequestItems.push(requestItem);
+        }
+
+        // If requested quantity exceeds stock, create purchase request for remaining
+        const remainingQuantity = Math.max(0, itemDto.quantity - item.currentStock);
+        if (remainingQuantity > 0) {
+          purchaseRequestItems.push({
+            item,
+            quantity: remainingQuantity,
+            unitCost: item.unitCost || 0,
+          });
+        }
       }
+
+      // Create material request only if we have items to request from stock
+      let savedRequest: MaterialRequest | null = null;
+
+      if (materialRequestItems.length > 0) {
+        const materialRequest = this.materialRequestRepository.create({
+          maintenanceScheduleId: createDto.maintenanceScheduleId,
+          requestedById: userId,
+          status: MaterialRequestStatus.PENDING,
+          notes: createDto.notes,
+          items: materialRequestItems,
+        });
+
+        savedRequest = await queryRunner.manager.save(materialRequest);
+      }
+
+      // Create purchase request if we have items to purchase
+      if (purchaseRequestItems.length > 0) {
+        const purchaseRequest = this.purchaseRequestRepository.create({
+          maintenanceScheduleId: createDto.maintenanceScheduleId,
+          requestedById: userId,
+          status: PurchaseRequestStatus.PENDING,
+          notes: `Purchase request for remaining items - ${createDto.notes}`,
+        });
+
+        const savedPurchaseRequest = await queryRunner.manager.save(purchaseRequest);
+
+        // Create purchase request items
+        for (const purchaseItem of purchaseRequestItems) {
+          const purchaseRequestItem = this.purchaseRequestItemRepository.create({
+            purchaseRequestId: savedPurchaseRequest.id,
+            inventoryItemCode: purchaseItem.item.code,
+            requestedQuantity: purchaseItem.quantity,
+            unitCost: purchaseItem.unitCost,
+            totalCost: purchaseItem.quantity * purchaseItem.unitCost,
+          });
+
+          await queryRunner.manager.save(purchaseRequestItem);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Return the material request if it was created, otherwise return null or throw an error
+      if (savedRequest) {
+        return this.findOne(savedRequest.id);
+      } else if (purchaseRequestItems.length > 0) {
+        // If only purchase requests were created, we might want to return some indication
+        // For now, let's return null and handle this in the controller
+        return null as any;
+      } else {
+        throw new BadRequestException('No valid items to request');
+      }
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Create material request
-    const materialRequest = this.materialRequestRepository.create({
-      maintenanceScheduleId: createDto.maintenanceScheduleId,
-      requestedById: userId,
-      status: MaterialRequestStatus.PENDING,
-      notes: createDto.notes,
-      items: requestItems,
-    });
-
-    const savedRequest = await this.materialRequestRepository.save(materialRequest);
-
-    return savedRequest;
   }
 
   async findAll(filters?: { status?: MaterialRequestStatus; maintenanceScheduleId?: string }) {
@@ -173,8 +232,6 @@ export class MaterialRequestService {
         await queryRunner.manager.save(request);
 
         // Process each item
-        const purchaseRequestItems: PurchaseRequestItem[] = [];
-        let needsPurchase = false;
 
         for (const item of request.items) {
           if (item.requestType === RequestItemType.USAGE) {
@@ -221,46 +278,10 @@ export class MaterialRequestService {
             item.status = RequestItemStatus.FULFILLED;
             item.actualQuantityUsed = item.requestedQuantity;
             await queryRunner.manager.save(item);
-          } else if (item.requestType === RequestItemType.PURCHASE) {
-            // Mark for purchase
-            item.status = RequestItemStatus.APPROVED;
-            await queryRunner.manager.save(item);
-
-            const inventoryItem = await queryRunner.manager.findOne(InventoryItem, {
-              where: { code: item.inventoryItemCode },
-            });
-
-            if (inventoryItem) {
-              const purchaseItem = queryRunner.manager.create(PurchaseRequestItem, {
-                inventoryItemCode: item.inventoryItemCode,
-                requestedQuantity: item.requestedQuantity,
-                unitCost: inventoryItem.unitCost || 0,
-                totalCost: item.requestedQuantity * (inventoryItem.unitCost || 0),
-              });
-              purchaseRequestItems.push(purchaseItem);
-              needsPurchase = true;
-            }
-          }
+          // Note: PURCHASE items are no longer created in material requests
+          // Purchase requests are created separately during material request creation
         }
-
-        // Create purchase request if needed
-        if (needsPurchase && purchaseRequestItems.length > 0) {
-          const totalCost = purchaseRequestItems.reduce((sum, item) => sum + item.totalCost, 0);
-
-          const purchaseRequest = queryRunner.manager.create(PurchaseRequest, {
-            materialRequestId: request.id,
-            requestedById: userId,
-            status: PurchaseRequestStatus.PENDING,
-            totalCost,
-            items: purchaseRequestItems,
-          });
-
-          await queryRunner.manager.save(purchaseRequest);
-        }
-
-        // Note: Maintenance schedule status will be updated when materials are delivered
-
-        await queryRunner.commitTransaction();
+      }
       } else {
         // Reject the request
         request.status = MaterialRequestStatus.REJECTED;
@@ -274,9 +295,9 @@ export class MaterialRequestService {
         }
 
         await queryRunner.manager.save(request);
-        await queryRunner.commitTransaction();
       }
 
+      await queryRunner.commitTransaction();
       return this.findOne(id);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -284,69 +305,6 @@ export class MaterialRequestService {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  async update(id: string, updateDto: any, userId: string) {
-    const request = await this.findOne(id);
-
-    // Only allow updating PENDING requests
-    if (request.status !== MaterialRequestStatus.PENDING) {
-      throw new BadRequestException('Only PENDING material requests can be updated');
-    }
-
-    // Update allowed fields
-    if (updateDto.notes) {
-      request.notes = updateDto.notes;
-    }
-
-    // Update items if provided
-    if (updateDto.items) {
-      // Remove existing items
-      await this.materialRequestItemRepository.delete({ materialRequestId: id });
-
-      // Add new items
-      const items: MaterialRequestItem[] = [];
-      for (const itemDto of updateDto.items) {
-        const item = await this.inventoryRepository.findOne({
-          where: { code: itemDto.itemCode },
-        });
-
-        if (!item) {
-          throw new NotFoundException(`Inventory item with code ${itemDto.itemCode} not found`);
-        }
-
-        const requestType = itemDto.requestType || (item.currentStock >= itemDto.requestedQuantity ? RequestItemType.USAGE : RequestItemType.PURCHASE);
-
-        const requestItem = this.materialRequestItemRepository.create({
-          inventoryItemCode: itemDto.itemCode,
-          requestedQuantity: itemDto.quantity,
-          availableQuantity: item.currentStock,
-          requestType,
-          status: RequestItemStatus.PENDING,
-        });
-
-        items.push(requestItem);
-      }
-
-      request.items = items;
-    }
-
-    return this.materialRequestRepository.save(request);
-  }
-
-  async remove(id: string, userId: string): Promise<void> {
-    const request = await this.findOne(id);
-
-    // Only allow deleting PENDING requests
-    if (request.status !== MaterialRequestStatus.PENDING) {
-      throw new BadRequestException('Only PENDING material requests can be deleted');
-    }
-
-    // Delete associated items first
-    await this.materialRequestItemRepository.delete({ materialRequestId: id });
-
-    // Delete the request
-    await this.materialRequestRepository.remove(request);
   }
 
   async receive(id: string, receiveDto: ReceiveMaterialRequestDto, userId: string): Promise<MaterialRequest> {
@@ -375,20 +333,37 @@ export class MaterialRequestService {
       request.notes = receiveDto.notes || request.notes;
       await queryRunner.manager.save(request);
 
-      // Check if all material requests for this maintenance are delivered
+      // Check maintenance status based on material and purchase request completion
       if (request.maintenanceSchedule) {
         const allMaterialRequests = await queryRunner.manager.find(MaterialRequest, {
           where: { maintenanceScheduleId: request.maintenanceScheduleId },
         });
 
-        const allDelivered = allMaterialRequests.every(mr => mr.status === MaterialRequestStatus.DELIVERED);
+        const allPurchaseRequests = await queryRunner.manager.find(PurchaseRequest, {
+          where: { maintenanceScheduleId: request.maintenanceScheduleId },
+        });
 
-        // Only set maintenance status to STARTED if all material requests are delivered
-        if (allDelivered) {
+        const allMaterialsDelivered = allMaterialRequests.every(mr => mr.status === MaterialRequestStatus.DELIVERED);
+        const allPurchasesCompleted = allPurchaseRequests.every(pr => pr.status === PurchaseRequestStatus.COMPLETED);
+
+        // Set maintenance status based on completion state
+        if (allMaterialsDelivered && allPurchasesCompleted) {
+          // All materials and purchases are complete - set to STARTED
           request.maintenanceSchedule.status = ScheduleStatus.STARTED;
           request.maintenanceSchedule.startedAt = new Date();
-          await queryRunner.manager.save(request.maintenanceSchedule);
+        } else if (allMaterialsDelivered && allPurchaseRequests.length > 0) {
+          // Materials are delivered but purchases are still pending - set to PARTIALLY_STARTED
+          request.maintenanceSchedule.status = ScheduleStatus.PARTIALLY_STARTED;
+          if (!request.maintenanceSchedule.startedAt) {
+            request.maintenanceSchedule.startedAt = new Date();
+          }
+        } else if (allMaterialsDelivered && allPurchaseRequests.length === 0) {
+          // No purchase requests needed, all materials delivered - set to STARTED
+          request.maintenanceSchedule.status = ScheduleStatus.STARTED;
+          request.maintenanceSchedule.startedAt = new Date();
         }
+
+        await queryRunner.manager.save(request.maintenanceSchedule);
       }
 
       await queryRunner.commitTransaction();
