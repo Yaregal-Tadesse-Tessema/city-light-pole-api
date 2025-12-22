@@ -364,8 +364,10 @@ export class PurchaseRequestService {
       where: { id: maintenanceScheduleId },
     });
 
-    if (!maintenanceSchedule || maintenanceSchedule.status !== ScheduleStatus.REQUESTED) {
-      return; // Only update if currently REQUESTED
+    if (!maintenanceSchedule ||
+        maintenanceSchedule.status === ScheduleStatus.STARTED ||
+        maintenanceSchedule.status === ScheduleStatus.COMPLETED) {
+      return; // Don't update if already started or completed
     }
 
     // Check if all material requests for this maintenance schedule are fulfilled
