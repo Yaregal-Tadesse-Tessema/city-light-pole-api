@@ -32,6 +32,8 @@ export class PurchaseRequestService {
     private materialRequestRepository: Repository<MaterialRequest>,
     @InjectRepository(MaterialRequestItem)
     private materialRequestItemRepository: Repository<MaterialRequestItem>,
+    @InjectRepository(MaintenanceSchedule)
+    private maintenanceScheduleRepository: Repository<MaintenanceSchedule>,
     private dataSource: DataSource,
     private notificationsService: NotificationsService,
   ) {}
@@ -280,6 +282,19 @@ export class PurchaseRequestService {
       request.status = PurchaseRequestStatus.COMPLETED;
       request.receivedAt = new Date();
       await queryRunner.manager.save(request);
+
+      // If linked to maintenance schedule, update maintenance status to STARTED
+      if (request.maintenanceScheduleId) {
+        const maintenanceSchedule = await queryRunner.manager.findOne(MaintenanceSchedule, {
+          where: { id: request.maintenanceScheduleId },
+        });
+
+        if (maintenanceSchedule && maintenanceSchedule.status === ScheduleStatus.REQUESTED) {
+          maintenanceSchedule.status = ScheduleStatus.STARTED;
+          maintenanceSchedule.startedAt = new Date();
+          await queryRunner.manager.save(maintenanceSchedule);
+        }
+      }
 
       // Send notification to purchase managers
       const purchaseTitle = request.supplierName
