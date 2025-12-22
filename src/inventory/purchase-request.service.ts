@@ -283,17 +283,9 @@ export class PurchaseRequestService {
       request.receivedAt = new Date();
       await queryRunner.manager.save(request);
 
-      // If linked to maintenance schedule, update maintenance status to STARTED
+      // If linked to maintenance schedule, check if all related purchases are received
       if (request.maintenanceScheduleId) {
-        const maintenanceSchedule = await queryRunner.manager.findOne(MaintenanceSchedule, {
-          where: { id: request.maintenanceScheduleId },
-        });
-
-        if (maintenanceSchedule && maintenanceSchedule.status === ScheduleStatus.REQUESTED) {
-          maintenanceSchedule.status = ScheduleStatus.STARTED;
-          maintenanceSchedule.startedAt = new Date();
-          await queryRunner.manager.save(maintenanceSchedule);
-        }
+        await this.checkAndUpdateMaintenanceStatus(queryRunner, request.maintenanceScheduleId);
       }
 
       // Send notification to purchase managers
@@ -335,6 +327,11 @@ export class PurchaseRequestService {
           if (allFulfilled) {
             materialRequest.status = MaterialRequestStatus.FULFILLED;
             await queryRunner.manager.save(materialRequest);
+
+            // Check if all material requests for this maintenance are fulfilled
+            if (materialRequest.maintenanceScheduleId) {
+              await this.checkAndUpdateMaintenanceStatus(queryRunner, materialRequest.maintenanceScheduleId);
+            }
           }
         }
       }
@@ -359,6 +356,52 @@ export class PurchaseRequestService {
     request.status = PurchaseRequestStatus.APPROVED;
     request.orderedAt = new Date();
     return this.purchaseRequestRepository.save(request);
+  }
+
+  private async checkAndUpdateMaintenanceStatus(queryRunner: any, maintenanceScheduleId: string) {
+    // Find the maintenance schedule
+    const maintenanceSchedule = await queryRunner.manager.findOne(MaintenanceSchedule, {
+      where: { id: maintenanceScheduleId },
+    });
+
+    if (!maintenanceSchedule || maintenanceSchedule.status !== ScheduleStatus.REQUESTED) {
+      return; // Only update if currently REQUESTED
+    }
+
+    // Check if all material requests for this maintenance schedule are fulfilled
+    const materialRequests = await queryRunner.manager.find(MaterialRequest, {
+      where: { maintenanceScheduleId },
+    });
+
+    // Check if all purchase requests directly linked to this maintenance are completed
+    const directPurchaseRequests = await queryRunner.manager.find(PurchaseRequest, {
+      where: { maintenanceScheduleId },
+    });
+
+    // Check if all material requests are fulfilled
+    let allMaterialRequestsFulfilled = true;
+    for (const materialRequest of materialRequests) {
+      if (materialRequest.status !== MaterialRequestStatus.FULFILLED) {
+        allMaterialRequestsFulfilled = false;
+        break;
+      }
+    }
+
+    // Check if all direct purchase requests are completed
+    let allDirectPurchasesCompleted = true;
+    for (const purchaseRequest of directPurchaseRequests) {
+      if (purchaseRequest.status !== PurchaseRequestStatus.COMPLETED) {
+        allDirectPurchasesCompleted = false;
+        break;
+      }
+    }
+
+    // If all material requests are fulfilled AND all direct purchase requests are completed
+    if (allMaterialRequestsFulfilled && allDirectPurchasesCompleted) {
+      maintenanceSchedule.status = ScheduleStatus.STARTED;
+      maintenanceSchedule.startedAt = new Date();
+      await queryRunner.manager.save(maintenanceSchedule);
+    }
   }
 }
 
