@@ -9,13 +9,15 @@ import {
   Min,
   Max,
   IsUUID,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   AccidentType,
   DamageLevel,
   AccidentStatus,
-  ClaimStatus
+  ClaimStatus,
+  DamagedComponent
 } from '../enums/accident.enums';
 
 export class UpdateAccidentDto {
@@ -117,4 +119,20 @@ export class UpdateAccidentDto {
     transport: number;
     total: number;
   };
+
+  @ApiPropertyOptional({ enum: AccidentStatus })
+  @IsOptional()
+  @IsEnum(AccidentStatus)
+  status?: AccidentStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  inspectedById?: string;
+
+  @ApiPropertyOptional({ enum: DamagedComponent, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(DamagedComponent, { each: true })
+  damagedComponents?: DamagedComponent[];
 }
