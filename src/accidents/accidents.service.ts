@@ -470,12 +470,15 @@ export class AccidentsService {
 
     // Auto-calculate cost if damage assessment is complete
     if (updateAccidentDto.damageLevel && updateAccidentDto.damagedComponents) {
+      const poleType = accident.pole?.poleType || 'STANDARD';
       updateAccidentDto.estimatedCost = await this.calculateCost(
+        poleType,
         updateAccidentDto.damageLevel,
         updateAccidentDto.damagedComponents
       );
 
-      updateAccidentDto.costBreakdown = await this.generateCostBreakdown(
+      updateAccidentDto.costBreakdown = this.generateCostBreakdown(
+        poleType,
         updateAccidentDto.damageLevel,
         updateAccidentDto.damagedComponents
       );
@@ -714,56 +717,70 @@ export class AccidentsService {
     return `ACC-${year}${month}-${sequence}`;
   }
 
-  private async calculateCost(damageLevel: DamageLevel, damagedComponentIds: string[]): Promise<number> {
+  private calculateCost(poleType: string, damageLevel: DamageLevel, damagedComponents: DamagedComponent[]): Promise<number> {
     let total = 0;
 
-    // Add costs for each selected component
-    for (const componentId of damagedComponentIds) {
-      const cost = await this.damagedComponentsService.getCostByLevel(componentId, damageLevel);
-      total += cost;
+    // Add pole cost if pole is included
+    if (damagedComponents.includes(DamagedComponent.POLE)) {
+      const poleCosts = COST_ESTIMATION_TABLES.POLE_TYPES[poleType as keyof typeof COST_ESTIMATION_TABLES.POLE_TYPES] || COST_ESTIMATION_TABLES.POLE_TYPES.STANDARD;
+      total += poleCosts[damageLevel];
     }
 
-    // Add fixed costs (labor and transport) - these could also be made configurable later
-    total += 300; // Labor
-    total += 200; // Transport
+    // Add costs for each selected component
+    for (const component of damagedComponents) {
+      if (component !== DamagedComponent.POLE) { // Pole cost already added above
+        const componentCosts = COST_ESTIMATION_TABLES.COMPONENTS[component as keyof typeof COST_ESTIMATION_TABLES.COMPONENTS];
+        if (componentCosts) {
+          total += componentCosts[damageLevel];
+        }
+      }
+    }
 
-    return total;
+    // Add fixed costs (labor and transport)
+    total += COST_ESTIMATION_TABLES.FIXED_COSTS.LABOR;
+    total += COST_ESTIMATION_TABLES.FIXED_COSTS.TRANSPORT_TRAFFIC_CONTROL;
+
+    return Promise.resolve(total);
   }
 
-  private async generateCostBreakdown(damageLevel: DamageLevel, damagedComponentIds: string[]): Promise<any> {
-    const allComponents = await this.damagedComponentsService.findAll(true);
+  private generateCostBreakdown(poleType: string, damageLevel: DamageLevel, damagedComponents: DamagedComponent[]): any {
     const breakdown = {
       pole: 0,
       luminaire: 0,
       armBracket: 0,
       foundation: 0,
       cable: 0,
-      labor: 300, // Fixed labor cost
-      transport: 200, // Fixed transport cost
+      labor: COST_ESTIMATION_TABLES.FIXED_COSTS.LABOR,
+      transport: COST_ESTIMATION_TABLES.FIXED_COSTS.TRANSPORT_TRAFFIC_CONTROL,
       total: 0,
     };
 
+    // Add pole cost if pole is included
+    if (damagedComponents.includes(DamagedComponent.POLE)) {
+      const poleCosts = COST_ESTIMATION_TABLES.POLE_TYPES[poleType as keyof typeof COST_ESTIMATION_TABLES.POLE_TYPES] || COST_ESTIMATION_TABLES.POLE_TYPES.STANDARD;
+      breakdown.pole = poleCosts[damageLevel];
+    }
+
     // Calculate costs for selected components
-    for (const componentId of damagedComponentIds) {
-      const component = allComponents.find(c => c.id === componentId);
-      if (component) {
-        const cost = await this.damagedComponentsService.getCostByLevel(componentId, damageLevel);
-        switch (component.componentType) {
-          case 'POLE':
-            breakdown.pole = cost;
-            break;
-          case 'LUMINAIRE':
-            breakdown.luminaire = cost;
-            break;
-          case 'ARM_BRACKET':
-            breakdown.armBracket = cost;
-            break;
-          case 'FOUNDATION':
-            breakdown.foundation = cost;
-            break;
-          case 'CABLE':
-            breakdown.cable = cost;
-            break;
+    for (const component of damagedComponents) {
+      if (component !== DamagedComponent.POLE) { // Pole cost already handled above
+        const componentCosts = COST_ESTIMATION_TABLES.COMPONENTS[component as keyof typeof COST_ESTIMATION_TABLES.COMPONENTS];
+        if (componentCosts) {
+          const cost = componentCosts[damageLevel];
+          switch (component) {
+            case DamagedComponent.LUMINAIRE:
+              breakdown.luminaire = cost;
+              break;
+            case DamagedComponent.ARM_BRACKET:
+              breakdown.armBracket = cost;
+              break;
+            case DamagedComponent.FOUNDATION:
+              breakdown.foundation = cost;
+              break;
+            case DamagedComponent.CABLE:
+              breakdown.cable = cost;
+              break;
+          }
         }
       }
     }
