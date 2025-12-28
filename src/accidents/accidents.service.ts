@@ -26,6 +26,7 @@ import {
   ApprovalStage,
   COST_ESTIMATION_TABLES,
   DamagedComponent,
+  DamageLevel,
 } from './enums/accident.enums';
 
 @Injectable()
