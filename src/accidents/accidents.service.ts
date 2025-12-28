@@ -14,7 +14,6 @@ import { AccidentApproval } from './entities/accident-approval.entity';
 import { PolesService } from '../poles/poles.service';
 import { PoleStatus } from '../poles/entities/light-pole.entity';
 import { FileService } from '../file/file.service';
-import { DamageLevel } from './entities/damaged-component.entity';
 import { CreateAccidentDto } from './dto/create-accident.dto';
 import { UpdateAccidentDto } from './dto/update-accident.dto';
 import { QueryAccidentsDto } from './dto/query-accidents.dto';

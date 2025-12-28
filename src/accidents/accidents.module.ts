@@ -8,7 +8,6 @@ import { Accident } from './entities/accident.entity';
 import { AccidentPhoto } from './entities/accident-photo.entity';
 import { AccidentAttachment } from './entities/accident-attachment.entity';
 import { AccidentApproval } from './entities/accident-approval.entity';
-import { DamagedComponent } from './entities/damaged-component.entity';
 import { PolesModule } from '../poles/poles.module';
 import { FileModule } from '../file/file.module';
 
