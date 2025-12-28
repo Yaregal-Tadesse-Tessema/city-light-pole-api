@@ -13,6 +13,8 @@ import { AccidentAttachment } from './entities/accident-attachment.entity';
 import { AccidentApproval } from './entities/accident-approval.entity';
 import { PolesService } from '../poles/poles.service';
 import { PoleStatus } from '../poles/entities/light-pole.entity';
+import { FileService } from '../file/file.service';
+import { DamageLevel } from './entities/damaged-component.entity';
 import { CreateAccidentDto } from './dto/create-accident.dto';
 import { UpdateAccidentDto } from './dto/update-accident.dto';
 import { QueryAccidentsDto } from './dto/query-accidents.dto';
@@ -40,6 +42,7 @@ export class AccidentsService {
     private readonly approvalRepository: Repository<AccidentApproval>,
     private readonly polesService: PolesService,
     private readonly dataSource: DataSource,
+    private readonly fileService: FileService,
   ) {}
 
   async create(createAccidentDto: CreateAccidentDto, userId: string): Promise<Accident> {
@@ -467,14 +470,12 @@ export class AccidentsService {
 
     // Auto-calculate cost if damage assessment is complete
     if (updateAccidentDto.damageLevel && updateAccidentDto.damagedComponents) {
-      updateAccidentDto.estimatedCost = this.calculateCost(
-        accident.pole?.poleType || 'STANDARD',
+      updateAccidentDto.estimatedCost = await this.calculateCost(
         updateAccidentDto.damageLevel,
         updateAccidentDto.damagedComponents
       );
 
-      updateAccidentDto.costBreakdown = this.generateCostBreakdown(
-        accident.pole?.poleType || 'STANDARD',
+      updateAccidentDto.costBreakdown = await this.generateCostBreakdown(
         updateAccidentDto.damageLevel,
         updateAccidentDto.damagedComponents
       );
@@ -521,21 +522,33 @@ export class AccidentsService {
         ? AccidentStatus.SUPERVISOR_REVIEW
         : AccidentStatus.REJECTED;
       console.log('✅ Supervisor approval processed. New status:', newStatus);
-    } else if (accident.status === AccidentStatus.SUPERVISOR_REVIEW) {
-      console.log('📋 Accident is SUPERVISOR_REVIEW - checking finance permissions');
-      if (!this.canApproveAsFinance(userRole)) {
-        console.log('❌ Finance permission denied for role:', userRole);
-        throw new ForbiddenException('Insufficient permissions for finance approval');
+      } else if (accident.status === AccidentStatus.SUPERVISOR_REVIEW) {
+        console.log('📋 Accident is SUPERVISOR_REVIEW - checking finance permissions');
+        if (!this.canApproveAsFinance(userRole)) {
+          console.log('❌ Finance permission denied for role:', userRole);
+          throw new ForbiddenException('Insufficient permissions for finance approval');
+        }
+        stage = ApprovalStage.FINANCE_REVIEW;
+        newStatus = approveDto.action === ApprovalAction.APPROVE
+          ? AccidentStatus.UNDER_REPAIR  // Move to repair phase after finance approval
+          : AccidentStatus.REJECTED;
+        console.log('✅ Finance approval processed. New status:', newStatus);
+      } else if (accident.status === AccidentStatus.UNDER_REPAIR) {
+        console.log('📋 Accident is UNDER_REPAIR - checking repair completion permissions');
+        // Allow inspectors and supervisors to mark repairs as complete
+        if (!this.canApproveAsSupervisor(userRole) && userRole !== 'INSPECTOR') {
+          console.log('❌ Repair completion permission denied for role:', userRole);
+          throw new ForbiddenException('Insufficient permissions to complete repairs');
+        }
+        stage = ApprovalStage.SUPERVISOR_REVIEW; // Reuse for repair completion
+        newStatus = approveDto.action === ApprovalAction.APPROVE
+          ? AccidentStatus.COMPLETED
+          : AccidentStatus.UNDER_REPAIR; // Stay in repair if not approved
+        console.log('✅ Repair completion processed. New status:', newStatus);
+      } else {
+        console.log('❌ Accident status not approvable:', accident.status);
+        throw new BadRequestException('Accident is not in an approvable state');
       }
-      stage = ApprovalStage.FINANCE_REVIEW;
-      newStatus = approveDto.action === ApprovalAction.APPROVE
-        ? AccidentStatus.APPROVED
-        : AccidentStatus.REJECTED;
-      console.log('✅ Finance approval processed. New status:', newStatus);
-    } else {
-      console.log('❌ Accident status not approvable:', accident.status);
-      throw new BadRequestException('Accident is not in an approvable state');
-    }
 
     // Update accident status and create approval record in transaction
     const queryRunner = this.dataSource.createQueryRunner();
@@ -593,15 +606,18 @@ export class AccidentsService {
   async addPhoto(accidentId: string, file: Express.Multer.File, description?: string): Promise<AccidentPhoto> {
     const accident = await this.findOne(accidentId);
 
+    // Upload file to MinIO
+    const uploadResult = await this.fileService.uploadFile(file, `accidents/${accidentId}/photos`);
+
     const photo = this.photoRepository.create({
       accidentId,
-      filename: file.filename,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      path: file.path,
+      filename: uploadResult.fileName,
+      originalName: uploadResult.originalName,
+      mimeType: uploadResult.mimeType,
+      size: uploadResult.size,
+      path: uploadResult.url,
       description,
-      isVideo: file.mimetype.startsWith('video/'),
+      isVideo: uploadResult.mimeType.startsWith('video/'),
     });
 
     return this.photoRepository.save(photo);
@@ -610,13 +626,16 @@ export class AccidentsService {
   async addAttachment(accidentId: string, file: Express.Multer.File, attachmentType: string, description?: string): Promise<AccidentAttachment> {
     const accident = await this.findOne(accidentId);
 
+    // Upload file to MinIO
+    const uploadResult = await this.fileService.uploadFile(file, `accidents/${accidentId}/attachments`);
+
     const attachment = this.attachmentRepository.create({
       accidentId,
-      filename: file.filename,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      path: file.path,
+      filename: uploadResult.fileName,
+      originalName: uploadResult.originalName,
+      mimeType: uploadResult.mimeType,
+      size: uploadResult.size,
+      path: uploadResult.url,
       attachmentType: attachmentType as any,
       description,
     });
@@ -695,70 +714,108 @@ export class AccidentsService {
     return `ACC-${year}${month}-${sequence}`;
   }
 
-  private calculateCost(poleType: string, damageLevel: any, damagedComponents: DamagedComponent[]): number {
-    const tables = COST_ESTIMATION_TABLES;
+  private async calculateCost(damageLevel: DamageLevel, damagedComponentIds: string[]): Promise<number> {
     let total = 0;
 
-    // Pole cost
-    if (damagedComponents.includes(DamagedComponent.POLE)) {
-      const poleCosts = tables.POLE_TYPES[poleType] || tables.POLE_TYPES.STANDARD;
-      total += poleCosts[damageLevel];
+    // Add costs for each selected component
+    for (const componentId of damagedComponentIds) {
+      const cost = await this.damagedComponentsService.getCostByLevel(componentId, damageLevel);
+      total += cost;
     }
 
-    // Component costs
-    damagedComponents.forEach(component => {
-      if (component !== DamagedComponent.POLE && tables.COMPONENTS[component]) {
-        total += tables.COMPONENTS[component][damageLevel];
-      }
-    });
-
-    // Fixed costs
-    total += tables.FIXED_COSTS.LABOR;
-    total += tables.FIXED_COSTS.TRANSPORT_TRAFFIC_CONTROL;
+    // Add fixed costs (labor and transport) - these could also be made configurable later
+    total += 300; // Labor
+    total += 200; // Transport
 
     return total;
   }
 
-  private generateCostBreakdown(poleType: string, damageLevel: any, damagedComponents: DamagedComponent[]): any {
-    const tables = COST_ESTIMATION_TABLES;
+  private async generateCostBreakdown(damageLevel: DamageLevel, damagedComponentIds: string[]): Promise<any> {
+    const allComponents = await this.damagedComponentsService.findAll(true);
     const breakdown = {
       pole: 0,
       luminaire: 0,
       armBracket: 0,
       foundation: 0,
       cable: 0,
-      labor: tables.FIXED_COSTS.LABOR,
-      transport: tables.FIXED_COSTS.TRANSPORT_TRAFFIC_CONTROL,
+      labor: 300, // Fixed labor cost
+      transport: 200, // Fixed transport cost
       total: 0,
     };
 
-    // Pole cost
-    if (damagedComponents.includes(DamagedComponent.POLE)) {
-      const poleCosts = tables.POLE_TYPES[poleType] || tables.POLE_TYPES.STANDARD;
-      breakdown.pole = poleCosts[damageLevel];
-    }
-
-    // Component costs
-    damagedComponents.forEach(component => {
-      if (component !== DamagedComponent.POLE && tables.COMPONENTS[component]) {
-        breakdown[component.toLowerCase()] = tables.COMPONENTS[component][damageLevel];
+    // Calculate costs for selected components
+    for (const componentId of damagedComponentIds) {
+      const component = allComponents.find(c => c.id === componentId);
+      if (component) {
+        const cost = await this.damagedComponentsService.getCostByLevel(componentId, damageLevel);
+        switch (component.componentType) {
+          case 'POLE':
+            breakdown.pole = cost;
+            break;
+          case 'LUMINAIRE':
+            breakdown.luminaire = cost;
+            break;
+          case 'ARM_BRACKET':
+            breakdown.armBracket = cost;
+            break;
+          case 'FOUNDATION':
+            breakdown.foundation = cost;
+            break;
+          case 'CABLE':
+            breakdown.cable = cost;
+            break;
+        }
       }
-    });
+    }
 
     breakdown.total = Object.values(breakdown).reduce((sum: number, cost: number) => sum + cost, 0);
     return breakdown;
   }
 
+  async updateClaimStatus(id: string, claimStatus: string, userId: string): Promise<Accident> {
+    console.log('🎯 Updating claim status for accident:', id, 'to:', claimStatus);
+
+    const accident = await this.findOne(id);
+
+    // Validate claim status
+    const validStatuses = ['NOT_SUBMITTED', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'];
+    if (!validStatuses.includes(claimStatus)) {
+      throw new BadRequestException('Invalid claim status');
+    }
+
+    accident.claimStatus = claimStatus as any;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await queryRunner.manager.save(accident);
+      await queryRunner.commitTransaction();
+      console.log('✅ Claim status updated to:', claimStatus);
+      return accident;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   private canApproveAsSupervisor(userRole: string): boolean {
     const role = userRole.toLowerCase();
     console.log('🔍 Checking supervisor approval for role:', userRole, '->', role);
-    return ['admin', 'supervisor', 'manager'].includes(role);
+    // Admin can do everything
+    if (role === 'admin') return true;
+    return ['supervisor', 'manager'].includes(role);
   }
 
   private canApproveAsFinance(userRole: string): boolean {
     const role = userRole.toLowerCase();
     console.log('🔍 Checking finance approval for role:', userRole, '->', role);
-    return ['admin', 'finance', 'manager'].includes(role);
+    // Admin can do everything
+    if (role === 'admin') return true;
+    return ['finance', 'manager'].includes(role);
   }
 
 
