@@ -4,6 +4,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AccidentsService } from './accidents.service';
 import { AccidentsController } from './accidents.controller';
+import { DamagedComponentsController } from './damaged-components.controller';
 import { Accident } from './entities/accident.entity';
 import { AccidentPhoto } from './entities/accident-photo.entity';
 import { AccidentAttachment } from './entities/accident-attachment.entity';
@@ -25,7 +26,7 @@ import { FileModule } from '../file/file.module';
       storage: memoryStorage(),
     }),
   ],
-  controllers: [AccidentsController],
+  controllers: [AccidentsController, DamagedComponentsController],
   providers: [AccidentsService],
   exports: [AccidentsService],
 })
