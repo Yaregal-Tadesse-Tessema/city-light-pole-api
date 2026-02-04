@@ -17,8 +17,8 @@ import {
   DamageLevel,
   AccidentStatus,
   ClaimStatus,
-  DamagedComponent
 } from '../enums/accident.enums';
+
 
 export class UpdateAccidentDto {
   @ApiPropertyOptional({ enum: AccidentType })
@@ -130,9 +130,12 @@ export class UpdateAccidentDto {
   @IsString()
   inspectedById?: string;
 
-  @ApiPropertyOptional({ enum: DamagedComponent, isArray: true })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Array of damaged component IDs from the damaged components database',
+    example: ['uuid-1', 'uuid-2']
+  })
   @IsOptional()
   @IsArray()
-  @IsEnum(DamagedComponent, { each: true })
-  damagedComponents?: DamagedComponent[];
+  damagedComponents?: string[];
 }

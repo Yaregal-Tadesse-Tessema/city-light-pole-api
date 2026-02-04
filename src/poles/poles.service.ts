@@ -6,7 +6,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, ILike, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { LightPole, PoleStatus } from './entities/light-pole.entity';
+import {
+  LightPole,
+  PoleStatus,
+  PolePosition,
+  PoleCondition,
+  District,
+  Structure,
+} from './entities/light-pole.entity';
 import { CreatePoleDto } from './dto/create-pole.dto';
 import { UpdatePoleDto } from './dto/update-pole.dto';
 import { QueryPolesDto } from './dto/query-poles.dto';
@@ -47,8 +54,11 @@ export class PolesService {
       powerRatingWatt: createPoleDto.powerRatingWatt,
       poleType: createPoleDto.poleType || 'STANDARD',
       lampType: createPoleDto.lampType || 'LED',
-      hasLedDisplay: createPoleDto.hasLedDisplay || false,
       status: createPoleDto.status || PoleStatus.OPERATIONAL,
+      polePosition: createPoleDto.polePosition ?? PolePosition.Up,
+      condition: createPoleDto.condition ?? PoleCondition.GOOD,
+      district: createPoleDto.district ?? District.Center,
+      structure: createPoleDto.structure ?? Structure.Steel,
     };
 
     // Add GPS coordinates only if provided
@@ -59,30 +69,8 @@ export class PolesService {
       poleData.gpsLng = createPoleDto.gpsLng;
     }
 
-    // Add LED fields only if hasLedDisplay is true
-    if (createPoleDto.hasLedDisplay) {
-      if (createPoleDto.ledModel) {
-        poleData.ledModel = createPoleDto.ledModel;
-      }
-      if (createPoleDto.ledInstallationDate) {
-        poleData.ledInstallationDate = new Date(createPoleDto.ledInstallationDate);
-      }
-      if (createPoleDto.ledStatus) {
-        poleData.ledStatus = createPoleDto.ledStatus;
-      }
-    }
-
-    // Add new fields
     if (createPoleDto.numberOfPoles !== undefined) {
       poleData.numberOfPoles = createPoleDto.numberOfPoles;
-    }
-    poleData.hasCamera = createPoleDto.hasCamera || false;
-    if (createPoleDto.hasCamera && createPoleDto.cameraInstallationDate) {
-      poleData.cameraInstallationDate = new Date(createPoleDto.cameraInstallationDate);
-    }
-    poleData.hasPhoneCharger = createPoleDto.hasPhoneCharger || false;
-    if (createPoleDto.hasPhoneCharger && createPoleDto.phoneChargerInstallationDate) {
-      poleData.phoneChargerInstallationDate = new Date(createPoleDto.phoneChargerInstallationDate);
     }
     if (createPoleDto.poleInstallationDate) {
       poleData.poleInstallationDate = new Date(createPoleDto.poleInstallationDate);
@@ -95,7 +83,19 @@ export class PolesService {
   }
 
   async findAll(queryDto: QueryPolesDto) {
-    const { page = 1, limit = 10, subcity, status, search, street, hasLedDisplay, sortBy, sortDirection } = queryDto;
+    const {
+      page = 1,
+      limit = 10,
+      subcity,
+      status,
+      polePosition,
+      condition,
+      district,
+      search,
+      street,
+      sortBy,
+      sortDirection,
+    } = queryDto;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.polesRepository.createQueryBuilder('pole');
@@ -108,14 +108,20 @@ export class PolesService {
       queryBuilder.andWhere('pole.status = :status', { status });
     }
 
-    if (street) {
-      queryBuilder.andWhere('pole.street = :street', { street });
+    if (polePosition) {
+      queryBuilder.andWhere('pole.polePosition = :polePosition', { polePosition });
     }
 
-    if (hasLedDisplay !== undefined && hasLedDisplay !== null) {
-      // Handle string from query params
-      const hasLedDisplayBool = hasLedDisplay === 'true' || hasLedDisplay === '1';
-      queryBuilder.andWhere('pole.hasLedDisplay = :hasLedDisplay', { hasLedDisplay: hasLedDisplayBool });
+    if (condition) {
+      queryBuilder.andWhere('pole.condition = :condition', { condition });
+    }
+
+    if (district) {
+      queryBuilder.andWhere('pole.district = :district', { district });
+    }
+
+    if (street) {
+      queryBuilder.andWhere('pole.street = :street', { street });
     }
 
     if (search) {
@@ -156,7 +162,13 @@ export class PolesService {
   }
 
   async findOne(code: string) {
-    const pole = await this.findOneByCode(code);
+    const pole = await this.polesRepository.findOne({
+      where: { code },
+      relations: ['poleComponents', 'poleComponents.component'],
+    });
+    if (!pole) {
+      throw new NotFoundException(`Pole with code ${code} not found`);
+    }
 
     // Get latest issues (last 5)
     const latestIssues = await this.issuesRepository.find({
@@ -272,14 +284,15 @@ export class PolesService {
         'pole.subcity',
         'pole.street',
         'pole.status',
+        'pole.polePosition',
+        'pole.condition',
+        'pole.district',
         'pole.gpsLat',
         'pole.gpsLng',
         'pole.poleType',
         'pole.heightMeters',
         'pole.lampType',
         'pole.powerRatingWatt',
-        'pole.hasLedDisplay',
-        'pole.ledModel',
         'pole.qrImageUrl',
         'pole.createdAt',
         'pole.updatedAt',

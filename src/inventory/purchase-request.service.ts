@@ -14,7 +14,7 @@ import { MaterialRequestItem, RequestItemStatus } from './entities/material-requ
 import { MaintenanceSchedule, ScheduleStatus } from '../maintenance/entities/maintenance-schedule.entity';
 import { CreatePurchaseRequestDto } from './dto/create-purchase-request.dto';
 import { ApprovePurchaseRequestDto } from './dto/approve-purchase-request.dto';
-import { ReceivePurchaseRequestDto } from './dto/receive-purchase-request.dto';
+import { ReceivePurchaseRequestDto, DeliverPurchaseRequestDto } from './dto/receive-purchase-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -78,16 +78,23 @@ export class PurchaseRequestService {
     return this.purchaseRequestRepository.save(purchaseRequest);
   }
 
-  async findAll(filters?: { status?: PurchaseRequestStatus }) {
+  async findAll(filters?: { status?: PurchaseRequestStatus; maintenanceScheduleId?: string }) {
     const queryBuilder = this.purchaseRequestRepository.createQueryBuilder('request')
       .leftJoinAndSelect('request.items', 'items')
       .leftJoinAndSelect('items.inventoryItem', 'inventoryItem')
       .leftJoinAndSelect('request.requestedBy', 'requestedBy')
       .leftJoinAndSelect('request.approvedBy', 'approvedBy')
-      .leftJoinAndSelect('request.materialRequest', 'materialRequest');
+      .leftJoinAndSelect('request.materialRequest', 'materialRequest')
+      .leftJoinAndSelect('request.maintenanceSchedule', 'maintenanceSchedule');
 
     if (filters?.status) {
       queryBuilder.andWhere('request.status = :status', { status: filters.status });
+    }
+
+    if (filters?.maintenanceScheduleId) {
+      queryBuilder.andWhere('request.maintenanceScheduleId = :maintenanceScheduleId', {
+        maintenanceScheduleId: filters.maintenanceScheduleId
+      });
     }
 
     return queryBuilder.orderBy('request.createdAt', 'DESC').getMany();
@@ -281,6 +288,7 @@ export class PurchaseRequestService {
       // Update purchase request status
       request.status = PurchaseRequestStatus.ARRIVED_IN_STOCK;
       request.receivedAt = new Date();
+      request.grnCode = receiveDto.grnCode;
       await queryRunner.manager.save(request);
 
       // If linked to maintenance schedule (directly or through material request), check if all related purchases are received
@@ -364,13 +372,12 @@ export class PurchaseRequestService {
     if (request.status !== PurchaseRequestStatus.APPROVED) {
       throw new BadRequestException(`Purchase request must be APPROVED before marking as ORDERED`);
     }
-
     request.status = PurchaseRequestStatus.ORDERED;
     request.orderedAt = new Date();
     return this.purchaseRequestRepository.save(request);
   }
 
-  async deliver(id: string, userId: string) {
+  async deliver(id: string, userId: string, deliverDto?: DeliverPurchaseRequestDto) {
     const request = await this.findOne(id);
 
     if (request.status !== PurchaseRequestStatus.ARRIVED_IN_STOCK) {
@@ -380,6 +387,7 @@ export class PurchaseRequestService {
     // Update status to DELIVERED
     request.status = PurchaseRequestStatus.DELIVERED;
     request.receivedAt = new Date(); // Reuse receivedAt for delivery timestamp
+    request.receivingCode = deliverDto?.receivingCode;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -436,12 +444,10 @@ export class PurchaseRequestService {
       console.log(`⏭️ Maintenance already ${maintenanceSchedule.status}, no update needed`);
       return; // Don't update if already started or completed
     }
-
     // Check if all material requests for this maintenance schedule are fulfilled
     const materialRequests = await queryRunner.manager.find(MaterialRequest, {
       where: { maintenanceScheduleId },
     });
-
     // Check if all purchase requests directly linked to this maintenance are completed
     const directPurchaseRequests = await queryRunner.manager.find(PurchaseRequest, {
       where: { maintenanceScheduleId },

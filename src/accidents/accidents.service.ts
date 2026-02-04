@@ -11,9 +11,11 @@ import { Accident } from './entities/accident.entity';
 import { AccidentPhoto } from './entities/accident-photo.entity';
 import { AccidentAttachment } from './entities/accident-attachment.entity';
 import { AccidentApproval } from './entities/accident-approval.entity';
+import { AccidentsDamagedComponets } from './entities/accidents-damaged-componets.entity';
 import { PolesService } from '../poles/poles.service';
 import { PoleStatus } from '../poles/entities/light-pole.entity';
 import { FileService } from '../file/file.service';
+import { DamagedComponentsService } from './damaged-components.service';
 import { CreateAccidentDto } from './dto/create-accident.dto';
 import { UpdateAccidentDto } from './dto/update-accident.dto';
 import { QueryAccidentsDto } from './dto/query-accidents.dto';
@@ -43,6 +45,7 @@ export class AccidentsService {
     private readonly polesService: PolesService,
     private readonly dataSource: DataSource,
     private readonly fileService: FileService,
+    private readonly damagedComponentsService: DamagedComponentsService,
   ) {}
 
   async create(createAccidentDto: CreateAccidentDto, userId: string): Promise<Accident> {
@@ -122,11 +125,15 @@ export class AccidentsService {
       qb.andWhere('accident.accidentDate <= :endDate', { endDate: query.endDate });
     }
 
-    const page = query.page || 1;
-    const limit = query.limit || 10;
-    const skip = (page - 1) * limit;
+    // Only apply pagination if page or limit are explicitly provided
+    const hasPagination = query.page !== undefined || query.limit !== undefined;
+    let page = query.page || 1;
+    let limit = query.limit || 10;
+    let skip = (page - 1) * limit;
 
-    qb.skip(skip).take(limit);
+    if (hasPagination) {
+      qb.skip(skip).take(limit);
+    }
 
     const [data, total] = await qb.getManyAndCount();
 
@@ -371,8 +378,8 @@ export class AccidentsService {
         </div>
 
         <div class="section">
-          <h3>Cost Breakdown</h3>
-          ${accident.costBreakdown ? `
+          <h3>Detailed Cost Breakdown</h3>
+          ${accident.damagedComponents && accident.damagedComponents.length > 0 ? `
             <table>
               <thead>
                 <tr>
@@ -381,41 +388,22 @@ export class AccidentsService {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Pole</td>
-                  <td>${accident.costBreakdown.pole || 0}</td>
-                </tr>
-                <tr>
-                  <td>Luminaire</td>
-                  <td>${accident.costBreakdown.luminaire || 0}</td>
-                </tr>
-                <tr>
-                  <td>Arm & Bracket</td>
-                  <td>${accident.costBreakdown.armBracket || 0}</td>
-                </tr>
-                <tr>
-                  <td>Foundation</td>
-                  <td>${accident.costBreakdown.foundation || 0}</td>
-                </tr>
-                <tr>
-                  <td>Cable</td>
-                  <td>${accident.costBreakdown.cable || 0}</td>
-                </tr>
-                <tr>
-                  <td>Labor</td>
-                  <td>${accident.costBreakdown.labor || 0}</td>
-                </tr>
-                <tr>
-                  <td>Transport & Traffic Control</td>
-                  <td>${accident.costBreakdown.transport || 0}</td>
-                </tr>
+                ${accident.damagedComponents.map((damagedComponent: any) => {
+                  const componentName = damagedComponent.damagedComponent?.name || damagedComponent.damagedComponentId;
+                  return `
+                    <tr>
+                      <td>${componentName}</td>
+                      <td>2,000.00</td>
+                    </tr>
+                  `;
+                }).join('')}
                 <tr class="total">
-                  <td><strong>Total Estimated Cost</strong></td>
-                  <td><strong>${accident.costBreakdown.total || 0} ETB</strong></td>
+                  <td><strong>Total Loss Cost</strong></td>
+                  <td><strong>${(accident.damagedComponents.length * 2000).toLocaleString()} ETB</strong></td>
                 </tr>
               </tbody>
             </table>
-          ` : '<p>No cost estimate available</p>'}
+          ` : '<p>No damaged components specified</p>'}
         </div>
 
         <div class="section">
@@ -446,6 +434,8 @@ export class AccidentsService {
         'attachments',
         'approvals',
         'approvals.approvedBy',
+        'damagedComponents',
+        'damagedComponents.damagedComponent',
       ],
     });
 
@@ -468,19 +458,23 @@ export class AccidentsService {
       updateAccidentDto.inspectedById = userId;
     }
 
+    // Handle damaged components - update junction table
+    if (updateAccidentDto.damagedComponents !== undefined) {
+      await this.updateAccidentDamagedComponents(accident.id, updateAccidentDto.damagedComponents);
+    }
+
     // Auto-calculate cost if damage assessment is complete
-    if (updateAccidentDto.damageLevel && updateAccidentDto.damagedComponents) {
-      const poleType = accident.pole?.poleType || 'STANDARD';
-      updateAccidentDto.estimatedCost = await this.calculateCost(
-        poleType,
+    if (updateAccidentDto.damageLevel) {
+      const damagedComponentIds = updateAccidentDto.damagedComponents || [];
+
+      updateAccidentDto.estimatedCost = await this.calculateCostFromComponents(
         updateAccidentDto.damageLevel,
-        updateAccidentDto.damagedComponents
+        damagedComponentIds
       );
 
-      updateAccidentDto.costBreakdown = this.generateCostBreakdown(
-        poleType,
+      updateAccidentDto.costBreakdown = await this.generateCostBreakdownFromComponents(
         updateAccidentDto.damageLevel,
-        updateAccidentDto.damagedComponents
+        damagedComponentIds
       );
     }
 
@@ -491,7 +485,13 @@ export class AccidentsService {
       updateAccidentDto.inspectedById = userId;
     }
 
-    Object.assign(accident, updateAccidentDto);
+    // Exclude damagedComponents from assignment since we handle it separately
+    const { damagedComponents, ...updateData } = updateAccidentDto;
+    Object.assign(accident, updateData);
+
+    // Clear loaded damagedComponents entities to prevent cascade issues
+    accident.damagedComponents = undefined;
+
     const savedAccident = await this.accidentRepository.save(accident);
     console.log('✅ Accident updated successfully. Status:', savedAccident.status);
     return savedAccident;
@@ -717,6 +717,95 @@ export class AccidentsService {
     return `ACC-${year}${month}-${sequence}`;
   }
 
+  private async getDamagedComponentEnumsForAccident(accidentId: string): Promise<DamagedComponent[]> {
+    const junctionEntities = await this.dataSource
+      .getRepository(AccidentsDamagedComponets)
+      .find({
+        where: { accidentId },
+        relations: ['damagedComponent'],
+      });
+
+    return junctionEntities.map(junction => {
+      // Map componentType string to enum value
+      switch (junction.damagedComponent.componentType) {
+        case 'POLE':
+          return DamagedComponent.POLE;
+        case 'LUMINAIRE':
+          return DamagedComponent.LUMINAIRE;
+        case 'ARM_BRACKET':
+          return DamagedComponent.ARM_BRACKET;
+        case 'FOUNDATION':
+          return DamagedComponent.FOUNDATION;
+        case 'CABLE':
+          return DamagedComponent.CABLE;
+        default:
+          return DamagedComponent.POLE; // fallback
+      }
+    });
+  }
+
+  private async updateAccidentDamagedComponents(accidentId: string, damagedComponentIds: string[]): Promise<void> {
+    // Delete existing junction table entries
+    await this.dataSource
+      .createQueryBuilder()
+      .delete()
+      .from(AccidentsDamagedComponets)
+      .where('accidentId = :accidentId', { accidentId })
+      .execute();
+
+    // Create new junction table entries
+    if (damagedComponentIds.length > 0) {
+      const junctionEntities = damagedComponentIds.map(componentId => ({
+        accidentId,
+        damagedComponentId: componentId,
+      }));
+
+      await this.dataSource
+        .createQueryBuilder()
+        .insert()
+        .into(AccidentsDamagedComponets)
+        .values(junctionEntities)
+        .execute();
+    }
+  }
+
+  private transformToEnumValues(damagedComponents: string[]): DamagedComponent[] {
+    return damagedComponents.map(component => {
+      // Try to match by enum value first
+      const enumValue = Object.values(DamagedComponent).find(enumVal => enumVal === component);
+      if (enumValue) return enumValue as DamagedComponent;
+
+      // Try to match by component name (case insensitive)
+      switch (component.toUpperCase()) {
+        case 'POLE':
+        case 'LIGHT POLE':
+          return DamagedComponent.POLE;
+        case 'LUMINAIRE':
+        case 'LUMINAIRE':
+          return DamagedComponent.LUMINAIRE;
+        case 'ARM_BRACKET':
+        case 'ARM BRACKET':
+        case 'ARM & BRACKET':
+          return DamagedComponent.ARM_BRACKET;
+        case 'FOUNDATION':
+          return DamagedComponent.FOUNDATION;
+        case 'CABLE':
+        case 'ELECTRICAL CABLE':
+          return DamagedComponent.CABLE;
+        default:
+          // If no match found, try to find it in the enum
+          const found = Object.values(DamagedComponent).find(enumVal =>
+            enumVal.toLowerCase() === component.toLowerCase()
+          );
+          if (found) return found as DamagedComponent;
+
+          // Default fallback
+          console.warn(`Unknown damaged component: ${component}, defaulting to POLE`);
+          return DamagedComponent.POLE;
+      }
+    });
+  }
+
   private calculateCost(poleType: string, damageLevel: DamageLevel, damagedComponents: DamagedComponent[]): Promise<number> {
     let total = 0;
 
@@ -743,6 +832,48 @@ export class AccidentsService {
     return Promise.resolve(total);
   }
 
+  private async generateCostBreakdownFromComponents(damageLevel: DamageLevel, damagedComponentIds: string[]): Promise<any> {
+    const allComponents = await this.damagedComponentsService.findActive();
+    const breakdown: { [key: string]: number } = {
+      labor: COST_ESTIMATION_TABLES.FIXED_COSTS.LABOR,
+      transport: COST_ESTIMATION_TABLES.FIXED_COSTS.TRANSPORT_TRAFFIC_CONTROL,
+      total: 0,
+    };
+
+    // Calculate costs for selected components based on damage level
+    for (const componentId of damagedComponentIds) {
+      const component = allComponents.find(c => c.id === componentId);
+      if (component) {
+        // Get cost based on damage level
+        let cost = 0;
+        switch (damageLevel) {
+          case DamageLevel.MINOR:
+            cost = Number(component.minorCost);
+            break;
+          case DamageLevel.MODERATE:
+            cost = Number(component.moderateCost);
+            break;
+          case DamageLevel.SEVERE:
+            cost = Number(component.severeCost);
+            break;
+          case DamageLevel.TOTAL_LOSS:
+            cost = Number(component.totalLossCost);
+            break;
+        }
+        // Use component ID as key for reliability
+        breakdown[componentId] = cost;
+      }
+    }
+
+    breakdown.total = Object.values(breakdown).reduce((sum: number, cost: number) => sum + cost, 0);
+    return breakdown;
+  }
+
+  private async calculateCostFromComponents(damageLevel: DamageLevel, damagedComponentIds: string[]): Promise<number> {
+    const breakdown = await this.generateCostBreakdownFromComponents(damageLevel, damagedComponentIds);
+    return breakdown.total;
+  }
+
   private generateCostBreakdown(poleType: string, damageLevel: DamageLevel, damagedComponents: DamagedComponent[]): any {
     const breakdown = {
       pole: 0,
@@ -755,37 +886,30 @@ export class AccidentsService {
       total: 0,
     };
 
-    // Add pole cost if pole is included
-    if (damagedComponents.includes(DamagedComponent.POLE)) {
-      const poleCosts = COST_ESTIMATION_TABLES.POLE_TYPES[poleType as keyof typeof COST_ESTIMATION_TABLES.POLE_TYPES] || COST_ESTIMATION_TABLES.POLE_TYPES.STANDARD;
-      breakdown.pole = poleCosts[damageLevel];
-    }
+    const poleCosts = COST_ESTIMATION_TABLES.POLE_TYPES[poleType as keyof typeof COST_ESTIMATION_TABLES.POLE_TYPES] || COST_ESTIMATION_TABLES.POLE_TYPES.STANDARD;
+    breakdown.pole = poleCosts[damageLevel];
 
-    // Calculate costs for selected components
     for (const component of damagedComponents) {
-      if (component !== DamagedComponent.POLE) { // Pole cost already handled above
-        const componentCosts = COST_ESTIMATION_TABLES.COMPONENTS[component as keyof typeof COST_ESTIMATION_TABLES.COMPONENTS];
-        if (componentCosts) {
-          const cost = componentCosts[damageLevel];
-          switch (component) {
-            case DamagedComponent.LUMINAIRE:
-              breakdown.luminaire = cost;
-              break;
-            case DamagedComponent.ARM_BRACKET:
-              breakdown.armBracket = cost;
-              break;
-            case DamagedComponent.FOUNDATION:
-              breakdown.foundation = cost;
-              break;
-            case DamagedComponent.CABLE:
-              breakdown.cable = cost;
-              break;
-          }
+      const componentCosts = COST_ESTIMATION_TABLES.COMPONENTS[component as keyof typeof COST_ESTIMATION_TABLES.COMPONENTS];
+      if (componentCosts) {
+        switch (component) {
+          case DamagedComponent.LUMINAIRE:
+            breakdown.luminaire = componentCosts[damageLevel];
+            break;
+          case DamagedComponent.ARM_BRACKET:
+            breakdown.armBracket = componentCosts[damageLevel];
+            break;
+          case DamagedComponent.FOUNDATION:
+            breakdown.foundation = componentCosts[damageLevel];
+            break;
+          case DamagedComponent.CABLE:
+            breakdown.cable = componentCosts[damageLevel];
+            break;
         }
       }
     }
 
-    breakdown.total = Object.values(breakdown).reduce((sum: number, cost: number) => sum + cost, 0);
+    breakdown.total = breakdown.pole + breakdown.luminaire + breakdown.armBracket + breakdown.foundation + breakdown.cable + breakdown.labor + breakdown.transport;
     return breakdown;
   }
 

@@ -11,7 +11,6 @@ import { AccidentAttachment } from './entities/accident-attachment.entity';
 import { AccidentApproval } from './entities/accident-approval.entity';
 import { DamagedComponent } from './entities/damaged-component.entity';
 import { DamagedComponentsService } from './damaged-components.service';
-import { SeedDamagedComponentsCommand } from './commands/seed-damaged-components.command';
 import { PolesModule } from '../poles/poles.module';
 import { FileModule } from '../file/file.module';
 
@@ -31,7 +30,7 @@ import { FileModule } from '../file/file.module';
     }),
   ],
   controllers: [AccidentsController, DamagedComponentsController],
-         providers: [AccidentsService, DamagedComponentsService, SeedDamagedComponentsCommand],
+         providers: [AccidentsService, DamagedComponentsService],
   exports: [AccidentsService],
 })
 export class AccidentsModule {}

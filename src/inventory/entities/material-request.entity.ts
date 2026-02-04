@@ -27,6 +27,9 @@ export class MaterialRequest {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ unique: true, nullable: true })
+  code: string | null;
+
   @ManyToOne(() => MaintenanceSchedule, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'maintenanceScheduleId' })
   maintenanceSchedule: MaintenanceSchedule;

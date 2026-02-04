@@ -1,7 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PoleStatus, Subcity } from '../entities/light-pole.entity';
+import {
+  PoleStatus,
+  Subcity,
+  PolePosition,
+  PoleCondition,
+  District,
+} from '../entities/light-pole.entity';
 
 export class QueryPolesDto {
   @ApiProperty({ required: false, default: 1 })
@@ -28,6 +34,21 @@ export class QueryPolesDto {
   @IsEnum(PoleStatus)
   status?: PoleStatus;
 
+  @ApiProperty({ enum: PolePosition, required: false })
+  @IsOptional()
+  @IsEnum(PolePosition)
+  polePosition?: PolePosition;
+
+  @ApiProperty({ enum: PoleCondition, required: false })
+  @IsOptional()
+  @IsEnum(PoleCondition)
+  condition?: PoleCondition;
+
+  @ApiProperty({ enum: District, required: false })
+  @IsOptional()
+  @IsEnum(District)
+  district?: District;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
@@ -38,12 +59,11 @@ export class QueryPolesDto {
   @IsString()
   street?: string;
 
-  @ApiProperty({ required: false, type: String })
-  @IsOptional()
-  @IsString()
-  hasLedDisplay?: string;
-
-  @ApiProperty({ required: false, enum: ['subcity', 'street'], description: 'Field to sort by' })
+  @ApiProperty({
+    required: false,
+    enum: ['subcity', 'street', 'polePosition', 'condition', 'district'],
+    description: 'Field to sort by',
+  })
   @IsOptional()
   @IsString()
   sortBy?: 'subcity' | 'street';

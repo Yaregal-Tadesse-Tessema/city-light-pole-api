@@ -8,6 +8,7 @@ export enum ScheduleFrequency {
 
 export enum ScheduleStatus {
   REQUESTED = 'REQUESTED',
+  PARTIALLY_STARTED = 'PARTIALLY_STARTED',
   STARTED = 'STARTED',
   PAUSED = 'PAUSED',
   COMPLETED = 'COMPLETED',

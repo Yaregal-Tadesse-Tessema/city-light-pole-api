@@ -6,6 +6,18 @@ export class ReceivePurchaseRequestDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiProperty({ required: false, description: 'Goods Received Note code' })
+  @IsOptional()
+  @IsString()
+  grnCode?: string;
+}
+
+export class DeliverPurchaseRequestDto {
+  @ApiProperty({ required: false, description: 'Receiving code for delivery' })
+  @IsOptional()
+  @IsString()
+  receivingCode?: string;
 }
 
 

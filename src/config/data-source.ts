@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { config as loadEnv } from 'dotenv';
 import { User } from '../users/entities/user.entity';
+
 import { LightPole } from '../poles/entities/light-pole.entity';
 import { PublicPark } from '../parks/entities/public-park.entity';
 import { ParkingLot } from '../parking-lots/entities/parking-lot.entity';
@@ -35,6 +36,8 @@ import { MaterialRequest } from '../inventory/entities/material-request.entity';
 import { MaterialRequestItem } from '../inventory/entities/material-request-item.entity';
 import { PurchaseRequest } from '../inventory/entities/purchase-request.entity';
 import { PurchaseRequestItem } from '../inventory/entities/purchase-request-item.entity';
+import { Component } from '../components/entities/component.entity';
+import { PoleComponent } from '../components/entities/pole-component.entity';
 
 loadEnv();
 
@@ -87,6 +90,8 @@ if (databaseUrl) {
               MaterialRequestItem,
               PurchaseRequest,
               PurchaseRequestItem,
+              Component,
+              PoleComponent,
             ],
             migrations: ['src/migrations/*.ts'],
             synchronize: false,
@@ -134,11 +139,46 @@ if (databaseUrl) {
               MaterialRequestItem,
               PurchaseRequest,
               PurchaseRequestItem,
+              Component,
+              PoleComponent,
     ],
     migrations: ['src/migrations/*.ts'],
     synchronize: false,
   };
 }
 
-export default new DataSource(dataSourceConfig);
+// Create data source with custom initialization
+const dataSource = new DataSource(dataSourceConfig);
+
+// Override initialize to run enum fixes first
+const originalInitialize = dataSource.initialize.bind(dataSource);
+dataSource.initialize = async () => {
+  const tempClient = new (require('pg').Client)({
+    host: 'localhost',
+    port: 5432,
+    user: 'postgres',
+    password: 'yaya@1984',
+    database: 'CityLightPoleDev'
+  });
+
+  try {
+    console.log('🔧 Running database enum fixes...');
+    await tempClient.connect();
+
+    // Fix enum values before TypeORM synchronization
+    await tempClient.query(`UPDATE purchase_requests SET status = 'COMPLETED' WHERE status = 'RECEIVED'`);
+    await tempClient.query(`UPDATE material_requests SET status = 'AWAITING_DELIVERY' WHERE status = 'APPROVED'`);
+
+    console.log('✅ Database enum values updated');
+  } catch (error) {
+    console.log('⚠️  Enum fix failed or already applied:', error.message);
+  } finally {
+    await tempClient.end();
+  }
+
+  // Now run normal TypeORM initialization
+  return originalInitialize();
+};
+
+export default dataSource;
 

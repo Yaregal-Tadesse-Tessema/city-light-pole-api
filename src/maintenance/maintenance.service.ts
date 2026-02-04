@@ -238,9 +238,11 @@ export class MaintenanceService {
     const schedule = this.schedulesRepository.create(createScheduleDto);
 
     // Generate unique maintenance code
-    const lastSchedule = await this.schedulesRepository.findOne({
+    const lastSchedules = await this.schedulesRepository.find({
       order: { createdAt: 'DESC' },
+      take: 1,
     });
+    const lastSchedule = lastSchedules[0];
 
     let nextNumber = 1;
     if (lastSchedule?.maintenanceCode) {

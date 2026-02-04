@@ -7,11 +7,13 @@ import {
   OneToMany,
 } from 'typeorm';
 import { PoleIssue } from '../../issues/entities/pole-issue.entity';
+import { PoleComponent } from '../../components/entities/pole-component.entity';
 
 export enum PoleStatus {
   OPERATIONAL = 'OPERATIONAL',
   FAULT_DAMAGED = 'FAULT_DAMAGED',
   UNDER_MAINTENANCE = 'UNDER_MAINTENANCE',
+  REPLACED = 'REPLACED',
 }
 
 export enum PoleType {
@@ -31,6 +33,34 @@ export enum LedStatus {
   OPERATIONAL = 'OPERATIONAL',
   ON_MAINTENANCE = 'ON_MAINTENANCE',
   FAILED_DAMAGED = 'FAILED_DAMAGED',
+}
+
+export enum Structure {
+  Wood = 'Wood',
+  Concrete = 'Concrete',
+  Steel = 'Steel',
+}
+
+export enum PolePosition {
+  Up = 'Up',
+  Down = 'Down',
+  Middle = 'Middle',
+}
+
+export enum PoleCondition {
+  NOT_IN_PLACE = 'Not in Place',
+  GOOD = 'Good',
+  BEND = 'Bend',
+  BROKEN_LAMP = 'Broken Lamp',
+  BOTH_POLE_LAMP_BROKEN = 'Both Pole & Lamp Broken',
+}
+
+export enum District {
+  West = 'west',
+  North = 'north',
+  South = 'south',
+  East = 'east',
+  Center = 'center',
 }
 
 export enum Subcity {
@@ -75,6 +105,13 @@ export class LightPole {
   })
   poleType: PoleType;
 
+  @Column({
+    type: 'enum',
+    enum: Structure,
+    default: Structure.Steel,
+  })
+  structure: Structure;
+
   @Column('decimal', { precision: 5, scale: 2 })
   heightMeters: number;
 
@@ -88,36 +125,8 @@ export class LightPole {
   @Column('int')
   powerRatingWatt: number;
 
-  @Column({ default: false })
-  hasLedDisplay: boolean;
-
-  @Column({ nullable: true })
-  ledModel: string;
-
-  @Column({ type: 'date', nullable: true })
-  ledInstallationDate: Date | null;
-
-  @Column({
-    type: 'enum',
-    enum: LedStatus,
-    nullable: true,
-  })
-  ledStatus: LedStatus | null;
-
   @Column({ type: 'int', nullable: true })
   numberOfPoles: number | null;
-
-  @Column({ default: false })
-  hasCamera: boolean;
-
-  @Column({ type: 'date', nullable: true })
-  cameraInstallationDate: Date | null;
-
-  @Column({ default: false })
-  hasPhoneCharger: boolean;
-
-  @Column({ type: 'date', nullable: true })
-  phoneChargerInstallationDate: Date | null;
 
   @Column({ type: 'date', nullable: true })
   poleInstallationDate: Date | null;
@@ -135,8 +144,32 @@ export class LightPole {
   })
   status: PoleStatus;
 
+  @Column({
+    type: 'enum',
+    enum: PolePosition,
+    default: PolePosition.Up,
+  })
+  polePosition: PolePosition;
+
+  @Column({
+    type: 'enum',
+    enum: PoleCondition,
+    default: PoleCondition.GOOD,
+  })
+  condition: PoleCondition;
+
+  @Column({
+    type: 'enum',
+    enum: District,
+    default: District.Center,
+  })
+  district: District;
+
   @OneToMany(() => PoleIssue, (issue) => issue.pole)
   issues: PoleIssue[];
+
+  @OneToMany(() => PoleComponent, (pc) => pc.pole)
+  poleComponents: PoleComponent[];
 
   @CreateDateColumn()
   createdAt: Date;

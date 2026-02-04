@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { MaterialRequest, MaterialRequestStatus } from './entities/material-request.entity';
 import { MaterialRequestItem, RequestItemType, RequestItemStatus } from './entities/material-request-item.entity';
 import { InventoryItem } from './entities/inventory-item.entity';
@@ -102,7 +102,10 @@ export class MaterialRequestService {
       let savedRequest: MaterialRequest | null = null;
 
       if (materialRequestItems.length > 0) {
+        const code = await this.generateNextCode(queryRunner.manager);
+
         const materialRequest = this.materialRequestRepository.create({
+          code,
           maintenanceScheduleId: createDto.maintenanceScheduleId,
           requestedById: userId,
           status: MaterialRequestStatus.PENDING,
@@ -415,6 +418,21 @@ export class MaterialRequestService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private async generateNextCode(manager: EntityManager): Promise<string> {
+    const result = await manager
+      .getRepository(MaterialRequest)
+      .createQueryBuilder('mr')
+      .select(
+        "COALESCE(MAX(CAST(SUBSTRING(mr.code FROM 4) AS INTEGER)), 0) + 1",
+        'next',
+      )
+      .where("mr.code LIKE 'MR-%'")
+      .getRawOne();
+
+    const nextNum = parseInt(result?.next || '1', 10);
+    return `MR-${String(nextNum).padStart(5, '0')}`;
   }
 
   async getByMaintenanceScheduleId(maintenanceScheduleId: string): Promise<MaterialRequest | null> {

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { DamagedComponent } from './entities/damaged-component.entity';
+import { AccidentsDamagedComponets } from './entities/accidents-damaged-componets.entity';
 import { CreateDamagedComponentDto } from './dto/create-damaged-component.dto';
 import { UpdateDamagedComponentDto } from './dto/update-damaged-component.dto';
 
@@ -74,6 +75,18 @@ export class DamagedComponentsService {
   }
 
   async remove(id: string): Promise<void> {
+    // Check if component is being used in any accidents
+    const usageCount = await this.dataSource
+      .getRepository(AccidentsDamagedComponets)
+      .count({ where: { damagedComponentId: id } });
+
+    if (usageCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete damaged component: it is currently used in ${usageCount} accident(s). ` +
+        `Please remove this component from all accidents before deleting it.`
+      );
+    }
+
     const component = await this.findOne(id);
     await this.damagedComponentRepository.remove(component);
   }

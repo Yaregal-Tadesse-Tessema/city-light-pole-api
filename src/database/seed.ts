@@ -191,7 +191,6 @@ async function seed() {
     ];
 
     // LED models for variety
-    const ledModels = ['LED-1000', 'LED-1500', 'LED-2000', 'LED-2500', 'LED-3000', 'LED-3500'];
 
     // Generate 5000 poles across Addis Ababa for extensive testing
     const samplePoles = [];
@@ -243,9 +242,6 @@ async function seed() {
           powerRatingWatt = 200 + Math.floor(Math.random() * 301); // 200-500W
       }
 
-      // Random LED display (30% chance)
-      const hasLedDisplay = Math.random() < 0.3;
-
       // Random status distribution
       const statusRand = Math.random();
       let status: PoleStatus;
@@ -268,30 +264,10 @@ async function seed() {
         heightMeters: Math.round(heightMeters * 10) / 10, // Round to 1 decimal
         lampType: lampType,
         powerRatingWatt: powerRatingWatt,
-        hasLedDisplay: hasLedDisplay,
         status: status,
-        numberOfBulbs: Math.floor(Math.random() * 4) + 1, // 1-4 bulbs
-        hasCamera: Math.random() < 0.4, // 40% have cameras
-        hasPhoneCharger: Math.random() < 0.3, // 30% have phone chargers
+        numberOfPoles: Math.floor(Math.random() * 4) + 1, // 1-4 poles
         poleInstallationDate: new Date(2020 + Math.floor(Math.random() * 5), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
       };
-
-      // Add LED-specific fields if applicable
-      if (hasLedDisplay) {
-        poleData.ledModel = ledModels[Math.floor(Math.random() * ledModels.length)];
-        poleData.ledInstallationDate = new Date(2022 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
-        poleData.ledStatus = Math.random() < 0.9 ? 'OPERATIONAL' : 'FAILED_DAMAGED';
-      }
-
-      // Add camera installation date if applicable
-      if (poleData.hasCamera) {
-        poleData.cameraInstallationDate = new Date(2021 + Math.floor(Math.random() * 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
-      }
-
-      // Add phone charger installation date if applicable
-      if (poleData.hasPhoneCharger) {
-        poleData.phoneChargerInstallationDate = new Date(2021 + Math.floor(Math.random() * 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
-      }
 
       samplePoles.push(poleData);
     }

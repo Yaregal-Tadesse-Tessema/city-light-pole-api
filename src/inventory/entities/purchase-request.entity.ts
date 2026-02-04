@@ -87,6 +87,12 @@ export class PurchaseRequest {
   @Column({ type: 'timestamp', nullable: true })
   receivedAt: Date | null;
 
+  @Column({ nullable: true })
+  grnCode: string | null;
+
+  @Column({ nullable: true })
+  receivingCode: string | null;
+
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'readyToDeliverById' })
   readyToDeliverBy: User | null;

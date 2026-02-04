@@ -56,9 +56,21 @@ import { EmailModule } from './email/email.module';
 import { FileModule } from './file/file.module';
 import { RolesModule } from './roles/roles.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PoleReplacementsModule } from './pole-replacements/pole-replacements.module';
+import { AccidentsModule } from './accidents/accidents.module';
+import { ComponentsModule } from './components/components.module';
 import { Role } from './roles/entities/role.entity';
 import { UserRole } from './roles/entities/user-role.entity';
 import { Notification } from './notifications/entities/notification.entity';
+import { PoleReplacement } from './pole-replacements/entities/pole-replacement.entity';
+import { Accident } from './accidents/entities/accident.entity';
+import { AccidentPhoto } from './accidents/entities/accident-photo.entity';
+import { AccidentAttachment } from './accidents/entities/accident-attachment.entity';
+import { AccidentApproval } from './accidents/entities/accident-approval.entity';
+import { DamagedComponent } from './accidents/entities/damaged-component.entity';
+import { AccidentsDamagedComponets } from './accidents/entities/accidents-damaged-componets.entity';
+import { Component } from './components/entities/component.entity';
+import { PoleComponent } from './components/entities/pole-component.entity';
 
 @Module({
   imports: [
@@ -118,6 +130,15 @@ import { Notification } from './notifications/entities/notification.entity';
               Role,
               UserRole,
               Notification,
+              PoleReplacement,
+              Accident,
+              AccidentPhoto,
+              AccidentAttachment,
+              AccidentApproval,
+              DamagedComponent,
+              AccidentsDamagedComponets,
+              Component,
+              PoleComponent,
             ],
             synchronize: configService.get('NODE_ENV') === 'development',
             logging: configService.get('NODE_ENV') === 'development',
@@ -167,6 +188,13 @@ import { Notification } from './notifications/entities/notification.entity';
               Role,
               UserRole,
               Notification,
+              PoleReplacement,
+              Accident,
+              AccidentPhoto,
+              AccidentAttachment,
+              AccidentApproval,
+              Component,
+              PoleComponent,
           ],
           synchronize: configService.get('NODE_ENV') === 'development',
           logging: configService.get('NODE_ENV') === 'development',
@@ -202,6 +230,9 @@ import { Notification } from './notifications/entities/notification.entity';
     InventoryModule,
     RolesModule,
     NotificationsModule,
+    PoleReplacementsModule,
+    AccidentsModule,
+    ComponentsModule,
     EmailModule,
     FileModule,
   ],

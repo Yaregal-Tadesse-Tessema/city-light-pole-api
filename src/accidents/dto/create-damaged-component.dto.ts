@@ -1,79 +1,49 @@
-import { IsString, IsEnum, IsNumber, IsBoolean, IsOptional, Min, IsPositive } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsEnum, IsNumber, IsOptional, IsBoolean, Min, IsNotEmpty } from 'class-validator';
 import { ComponentType } from '../entities/damaged-component.entity';
 
 export class CreateDamagedComponentDto {
-  @ApiProperty({
-    description: 'Name of the damaged component',
-    example: 'Luminaire'
-  })
+  @ApiProperty({ example: 'Light Pole', description: 'Name of the component' })
   @IsString()
+  @IsNotEmpty()
   name: string;
 
-  @ApiPropertyOptional({
-    description: 'Description of the component',
-    example: 'Light fixture and housing'
-  })
+  @ApiPropertyOptional({ example: 'Main support pole for street lighting', description: 'Optional description' })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({
-    description: 'Type of component',
-    example: ComponentType.LUMINAIRE,
-    enum: ComponentType
-  })
+  @ApiProperty({ enum: ComponentType, example: ComponentType.POLE, description: 'Type of component' })
   @IsEnum(ComponentType)
   componentType: ComponentType;
 
-  @ApiProperty({
-    description: 'Cost for minor damage',
-    example: 200
-  })
+  @ApiProperty({ example: 500, description: 'Cost for minor damage' })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   minorCost: number;
 
-  @ApiProperty({
-    description: 'Cost for moderate damage',
-    example: 400
-  })
+  @ApiProperty({ example: 1500, description: 'Cost for moderate damage' })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   moderateCost: number;
 
-  @ApiProperty({
-    description: 'Cost for severe damage',
-    example: 600
-  })
+  @ApiProperty({ example: 3000, description: 'Cost for severe damage' })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   severeCost: number;
 
-  @ApiProperty({
-    description: 'Cost for total loss',
-    example: 800
-  })
+  @ApiProperty({ example: 5000, description: 'Cost for total loss' })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   totalLossCost: number;
 
-  @ApiPropertyOptional({
-    description: 'Whether this component is active and available for selection',
-    example: true,
-    default: true
-  })
+  @ApiPropertyOptional({ example: true, description: 'Whether the component is active', default: true })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({
-    description: 'Order for displaying components in the UI',
-    example: 1,
-    default: 0
-  })
+  @ApiPropertyOptional({ example: 1, description: 'Sort order for display', default: 0 })
   @IsOptional()
   @IsNumber()
-  @Min(0)
   sortOrder?: number;
 }

@@ -11,7 +11,16 @@ import {
   IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PoleType, LampType, PoleStatus, Subcity, LedStatus } from '../entities/light-pole.entity';
+import {
+  PoleType,
+  LampType,
+  PoleStatus,
+  Subcity,
+  Structure,
+  PolePosition,
+  PoleCondition,
+  District,
+} from '../entities/light-pole.entity';
 
 export class CreatePoleDto {
   @ApiProperty({ example: 'LP-001', description: 'Unique pole code' })
@@ -47,6 +56,11 @@ export class CreatePoleDto {
   @IsOptional()
   poleType?: PoleType;
 
+  @ApiProperty({ enum: Structure, default: Structure.Steel, required: false })
+  @IsEnum(Structure)
+  @IsOptional()
+  structure?: Structure;
+
   @ApiProperty({ example: 8.5, description: 'Height in meters' })
   @IsOptional()
   heightMeters?: number;
@@ -61,52 +75,12 @@ export class CreatePoleDto {
   @Min(0)
   powerRatingWatt: number;
 
-  @ApiProperty({ example: false, default: false, required: false })
-  @IsBoolean()
-  @IsOptional()
-  hasLedDisplay?: boolean;
-
-  @ApiProperty({ example: 'LED-3000', required: false, description: 'Required if hasLedDisplay is true' })
-  @ValidateIf((o) => o.hasLedDisplay === true)
-  @IsString()
-  ledModel?: string;
-
-  @ApiProperty({ example: '2024-01-15', required: false, description: 'LED installation date (required if hasLedDisplay is true)' })
-  @ValidateIf((o) => o.hasLedDisplay === true)
-  @IsDateString()
-  ledInstallationDate?: string;
-
-  @ApiProperty({ enum: LedStatus, required: false, description: 'LED status (required if hasLedDisplay is true)' })
-  @ValidateIf((o) => o.hasLedDisplay === true)
-  @IsEnum(LedStatus)
-  ledStatus?: LedStatus;
-
   @ApiProperty({ example: 1, required: false, description: 'Number of poles' })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   numberOfPoles?: number;
-
-  @ApiProperty({ example: false, default: false, required: false })
-  @IsBoolean()
-  @IsOptional()
-  hasCamera?: boolean;
-
-  @ApiProperty({ example: '2024-01-15', required: false, description: 'Camera installation date (required if hasCamera is true)' })
-  @ValidateIf((o) => o.hasCamera === true)
-  @IsDateString()
-  cameraInstallationDate?: string;
-
-  @ApiProperty({ example: false, default: false, required: false })
-  @IsBoolean()
-  @IsOptional()
-  hasPhoneCharger?: boolean;
-
-  @ApiProperty({ example: '2024-01-15', required: false, description: 'Phone charger installation date (required if hasPhoneCharger is true)' })
-  @ValidateIf((o) => o.hasPhoneCharger === true)
-  @IsDateString()
-  phoneChargerInstallationDate?: string;
 
   @ApiProperty({ example: '2024-01-15', required: false, description: 'Pole installation date' })
   @IsOptional()
@@ -117,6 +91,21 @@ export class CreatePoleDto {
   @IsEnum(PoleStatus)
   @IsOptional()
   status?: PoleStatus;
+
+  @ApiProperty({ enum: PolePosition, default: PolePosition.Up, required: false })
+  @IsEnum(PolePosition)
+  @IsOptional()
+  polePosition?: PolePosition;
+
+  @ApiProperty({ enum: PoleCondition, default: PoleCondition.GOOD, required: false })
+  @IsEnum(PoleCondition)
+  @IsOptional()
+  condition?: PoleCondition;
+
+  @ApiProperty({ enum: District, default: District.Center, required: false })
+  @IsEnum(District)
+  @IsOptional()
+  district?: District;
 }
 
 

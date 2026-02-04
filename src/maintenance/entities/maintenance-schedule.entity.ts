@@ -14,6 +14,7 @@ import { PublicPark } from '../../parks/entities/public-park.entity';
 import { ParkingLot } from '../../parking-lots/entities/parking-lot.entity';
 import { Museum } from '../../museums/entities/museum.entity';
 import { MaterialRequest } from '../../inventory/entities/material-request.entity';
+import { PurchaseRequest } from '../../inventory/entities/purchase-request.entity';
 import { PublicToilet } from '../../public-toilets/entities/public-toilet.entity';
 import { FootballField } from '../../football-fields/entities/football-field.entity';
 import { RiverSideProject } from '../../river-side-projects/entities/river-side-project.entity';
@@ -27,6 +28,9 @@ export { ScheduleFrequency, ScheduleStatus };
 export class MaintenanceSchedule {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ unique: true, nullable: true })
+  maintenanceCode: string | null;
 
   @Column({ nullable: true })
   poleCode: string;
@@ -138,6 +142,9 @@ export class MaintenanceSchedule {
 
   @OneToMany(() => MaterialRequest, (materialRequest) => materialRequest.maintenanceSchedule)
   materialRequests: MaterialRequest[];
+
+  @OneToMany(() => PurchaseRequest, (purchaseRequest) => purchaseRequest.maintenanceSchedule)
+  purchaseRequests: PurchaseRequest[];
 
   @CreateDateColumn()
   createdAt: Date;

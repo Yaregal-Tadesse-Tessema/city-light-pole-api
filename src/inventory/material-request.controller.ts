@@ -76,22 +76,6 @@ export class MaterialRequestController {
     return this.materialRequestService.receive(id, receiveDto, req.user.userId);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a material request (only PENDING status)' })
-  async update(
-    @Param('id') id: string,
-    @Body() updateDto: any, // TODO: Create proper update DTO
-    @Request() req: any,
-  ) {
-    return this.materialRequestService.update(id, updateDto, req.user.userId);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a material request (only PENDING status)' })
-  async remove(@Param('id') id: string, @Request() req: any) {
-    await this.materialRequestService.remove(id, req.user.userId);
-    return { message: 'Material request deleted successfully' };
-  }
 }
 
 

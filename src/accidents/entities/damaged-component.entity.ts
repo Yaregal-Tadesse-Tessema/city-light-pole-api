@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AccidentsDamagedComponets } from './accidents-damaged-componets.entity';
 
 export enum ComponentType {
   POLE = 'POLE',
@@ -10,96 +11,67 @@ export enum ComponentType {
   OTHER = 'OTHER',
 }
 
+export enum DamageLevel {
+  MINOR = 'MINOR',
+  MODERATE = 'MODERATE',
+  SEVERE = 'SEVERE',
+  TOTAL_LOSS = 'TOTAL_LOSS',
+}
+
 @Entity('damaged_components')
 export class DamagedComponent {
-  @ApiProperty({
-    description: 'Unique identifier for the damaged component',
-    example: '550e8400-e29b-41d4-a716-446655440000'
-  })
+  @ApiProperty()
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({
-    description: 'Name of the damaged component',
-    example: 'Luminaire'
-  })
-  @Column({ unique: true })
+  @ApiProperty()
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @ApiProperty({
-    description: 'Description of the component',
-    example: 'Light fixture and housing',
-    required: false
-  })
+  @ApiPropertyOptional()
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description?: string;
 
-  @ApiProperty({
-    description: 'Type of component',
-    example: ComponentType.LUMINAIRE,
-    enum: ComponentType
-  })
+  @ApiProperty()
   @Column({
     type: 'enum',
     enum: ComponentType,
-    enumName: 'component_type_enum',
-    default: ComponentType.OTHER
+    default: ComponentType.OTHER,
   })
   componentType: ComponentType;
 
-  @ApiProperty({
-    description: 'Cost for minor damage',
-    example: 200
-  })
+  @ApiProperty()
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   minorCost: number;
 
-  @ApiProperty({
-    description: 'Cost for moderate damage',
-    example: 400
-  })
+  @ApiProperty()
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   moderateCost: number;
 
-  @ApiProperty({
-    description: 'Cost for severe damage',
-    example: 600
-  })
+  @ApiProperty()
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   severeCost: number;
 
-  @ApiProperty({
-    description: 'Cost for total loss',
-    example: 800
-  })
+  @ApiProperty()
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   totalLossCost: number;
 
-  @ApiProperty({
-    description: 'Whether this component is active and available for selection',
-    example: true
-  })
-  @Column({ default: true })
+  @ApiProperty()
+  @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @ApiProperty({
-    description: 'Order for displaying components in the UI',
-    example: 1
-  })
-  @Column({ default: 0 })
+  @ApiProperty()
+  @Column({ type: 'int', default: 0 })
   sortOrder: number;
 
-  @ApiProperty({
-    description: 'Creation timestamp',
-    example: '2023-12-28T08:30:00Z'
-  })
+  @OneToMany(() => AccidentsDamagedComponets, (adc) => adc.damagedComponent, { cascade: true, onDelete: 'CASCADE' })
+  accidentsDamagedComponets: AccidentsDamagedComponets[];
+
+  @ApiProperty()
   @CreateDateColumn()
   createdAt: Date;
 
-  @ApiProperty({
-    description: 'Last update timestamp',
-    example: '2023-12-28T08:30:00Z'
-  })
+  @ApiProperty()
   @UpdateDateColumn()
   updatedAt: Date;
 }

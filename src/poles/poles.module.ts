@@ -9,9 +9,9 @@ import { MaintenanceSchedule } from '../maintenance/entities/maintenance-schedul
   imports: [
     TypeOrmModule.forFeature([LightPole, PoleIssue, MaintenanceSchedule]),
   ],
+  
   controllers: [PolesController],
   providers: [PolesService],
   exports: [PolesService],
 })
 export class PolesModule {}
-
