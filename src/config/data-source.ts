@@ -154,11 +154,11 @@ const dataSource = new DataSource(dataSourceConfig);
 const originalInitialize = dataSource.initialize.bind(dataSource);
 dataSource.initialize = async () => {
   const tempClient = new (require('pg').Client)({
-    host: 'localhost',
-    port: 5432,
-    user: 'postgres',
-    password: 'yaya@1984',
-    database: 'CityLightPoleDev'
+    host: configService.get('DB_HOST', 'localhost'),
+    port: parseInt(configService.get('DB_PORT', '5432'), 10),
+    user: configService.get('DB_USERNAME', 'postgres'),
+    password: configService.get('DB_PASSWORD', 'postgres'),
+    database: configService.get('DB_NAME', 'smart_pole_dev')
   });
 
   try {

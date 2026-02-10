@@ -87,11 +87,11 @@ import { PoleComponent } from './components/entities/pole-component.entity';
           const url = new URL(databaseUrl);
           return {
             type: 'postgres',
-            host: 'localhost',
+            host: url.hostname,
             port: parseInt(url.port, 10) || 5432,
-            username: 'postgres',
-            password: 'yaya@1984',
-            database: 'CityLightPoleDev', // Remove leading /
+            username: url.username,
+            password: url.password,
+            database: url.pathname.slice(1), // Remove leading /
             entities: [
               User,
               LightPole,
@@ -151,11 +151,11 @@ import { PoleComponent } from './components/entities/pole-component.entity';
         // Fallback to individual env vars
         return {
           type: 'postgres',
-          host: 'localhost',
-          port: +5432,
-          username: 'postgres',
-          password: 'yaya@1984',
-          database: 'CityLightPoleDev',
+          host: configService.get('DB_HOST', 'localhost'),
+          port: parseInt(configService.get('DB_PORT', '5432'), 10),
+          username: configService.get('DB_USERNAME', 'postgres'),
+          password: configService.get('DB_PASSWORD', 'postgres'),
+          database: configService.get('DB_NAME', 'smart_pole_dev'),
           entities: [
             User,
             LightPole,
