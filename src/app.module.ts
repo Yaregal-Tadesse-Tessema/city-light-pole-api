@@ -87,11 +87,11 @@ import { PoleComponent } from './components/entities/pole-component.entity';
           const url = new URL(databaseUrl);
           return {
             type: 'postgres',
-            host: url.hostname,
-            port: parseInt(url.port, 10) || 5432,
-            username: url.username,
-            password: url.password,
-            database: url.pathname.slice(1), // Remove leading /
+            host: '196.189.124.228',
+            port: 5432,
+            username: 'postgres',
+            password: 'esaapp123!',
+            database: 'smart_pole_dev',
             entities: [
               User,
               LightPole,
