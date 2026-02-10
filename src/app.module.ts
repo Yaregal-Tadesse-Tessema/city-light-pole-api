@@ -81,10 +81,7 @@ import { PoleComponent } from './components/entities/pole-component.entity';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const databaseUrl = configService.get<string>('DATABASE_URL');
-        if (databaseUrl) {
           // Parse DATABASE_URL format: postgresql://user:password@host:port/database
-          const url = new URL(databaseUrl);
           return {
             type: 'postgres',
             host: '196.189.124.228',
@@ -147,7 +144,6 @@ import { PoleComponent } from './components/entities/pole-component.entity';
                 ? { rejectUnauthorized: false }
                 : false,
           };
-        }
         // Fallback to individual env vars
         return {
           type: 'postgres',
