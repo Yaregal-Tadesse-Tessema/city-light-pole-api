@@ -22,12 +22,6 @@ async function bootstrap() {
 
   // Enable CORS
   const corsOriginsConfig = configService.get<string>('CORS_ORIGINS', '*');
-  
-  // If CORS_ORIGINS is '*', allow all origins, otherwise use the configured list
-  const corsOrigin = corsOriginsConfig === '*' || corsOriginsConfig === ''
-    ? true // Allow all origins
-    : corsOriginsConfig.split(',').map((origin) => origin.trim());
-
   app.enableCors({
     origin: '*',
     credentials: true,
