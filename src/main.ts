@@ -21,16 +21,19 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // Enable CORS
-  const corsOrigins = configService
-    .get<string>('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim());
+  const corsOriginsConfig = configService.get<string>('CORS_ORIGINS', '*');
+  
+  // If CORS_ORIGINS is '*', allow all origins, otherwise use the configured list
+  const corsOrigin = corsOriginsConfig === '*' || corsOriginsConfig === ''
+    ? true // Allow all origins
+    : corsOriginsConfig.split(',').map((origin) => origin.trim());
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
   });
 
   const port = configService.get('PORT', 3011);
