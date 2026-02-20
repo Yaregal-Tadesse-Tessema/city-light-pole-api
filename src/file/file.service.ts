@@ -1,21 +1,36 @@
-import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client as MinioClient } from 'minio';
 
 @Injectable()
 export class FileService {
   private readonly logger = new Logger(FileService.name);
-  private minioClient: MinioClient;
+  private minioClient: MinioClient | null = null;
   private readonly bucketName: string = 'lightpoles';
   private readonly minioEndpoint: string;
   private readonly minioPort: number;
   private readonly useSSL: boolean;
+  private readonly minioEnabled: boolean;
+  private minioReady = false;
+  private minioInitPromise: Promise<void> | null = null;
 
   constructor(private configService: ConfigService) {
     // MinIO configuration
+    this.minioEnabled = this.configService.get<string>('MINIO_ENABLED', 'true') === 'true';
     this.minioEndpoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
     this.minioPort = parseInt(this.configService.get<string>('MINIO_PORT', '9000'), 10);
     this.useSSL = this.configService.get<string>('MINIO_USE_SSL', 'false') === 'true';
+
+    if (!this.minioEnabled) {
+      this.logger.warn('MinIO integration is disabled via MINIO_ENABLED=false');
+      return;
+    }
 
     // Initialize MinIO client
     this.minioClient = new MinioClient({
@@ -26,8 +41,59 @@ export class FileService {
       secretKey: 'AASXnjGFzUblLzzdA3fUePQUNNxzfoCwXo+CgaIP',
     });
 
-    // Ensure bucket exists
-    this.ensureBucketExists();
+    // Initialize bucket in the background. API startup should not depend on MinIO availability.
+    void this.initializeMinio();
+  }
+
+  /**
+   * Ensure bucket exists and mark MinIO readiness.
+   */
+  private async initializeMinio(): Promise<void> {
+    if (!this.minioClient) {
+      return;
+    }
+    if (this.minioInitPromise) {
+      return this.minioInitPromise;
+    }
+
+    this.minioInitPromise = (async () => {
+      try {
+        const exists = await this.minioClient!.bucketExists(this.bucketName);
+        if (!exists) {
+          await this.minioClient!.makeBucket(this.bucketName, 'us-east-1');
+          this.logger.log(`Bucket "${this.bucketName}" created successfully`);
+        } else {
+          this.logger.log(`Bucket "${this.bucketName}" already exists`);
+        }
+        this.minioReady = true;
+      } catch (error) {
+        this.minioReady = false;
+        this.logger.warn(
+          `MinIO unavailable. File endpoints will be disabled until MinIO is reachable: ${error.message}`,
+        );
+      } finally {
+        this.minioInitPromise = null;
+      }
+    })();
+
+    return this.minioInitPromise;
+  }
+
+  private async getMinioClientOrThrow(): Promise<MinioClient> {
+    if (!this.minioEnabled) {
+      throw new ServiceUnavailableException('File storage is disabled (MINIO_ENABLED=false)');
+    }
+    if (!this.minioClient) {
+      throw new ServiceUnavailableException('File storage client is not configured');
+    }
+    if (!this.minioReady) {
+      await this.initializeMinio();
+    }
+    if (!this.minioReady) {
+      throw new ServiceUnavailableException('File storage is unavailable. Ensure MinIO is running.');
+    }
+
+    return this.minioClient;
   }
 
   /**
@@ -35,9 +101,10 @@ export class FileService {
    */
   private async ensureBucketExists(): Promise<void> {
     try {
-      const exists = await this.minioClient.bucketExists(this.bucketName);
+      const client = await this.getMinioClientOrThrow();
+      const exists = await client.bucketExists(this.bucketName);
       if (!exists) {
-        await this.minioClient.makeBucket(this.bucketName, 'us-east-1');
+        await client.makeBucket(this.bucketName, 'us-east-1');
         this.logger.log(`Bucket "${this.bucketName}" created successfully`);
       } else {
         this.logger.log(`Bucket "${this.bucketName}" already exists`);
@@ -63,6 +130,8 @@ export class FileService {
     }
 
     try {
+      const client = await this.getMinioClientOrThrow();
+
       // Generate unique filename
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
@@ -73,7 +142,7 @@ export class FileService {
       const objectName = folder ? `${folder}/${fileName}` : fileName;
 
       // Upload file to MinIO
-      await this.minioClient.putObject(
+      await client.putObject(
         this.bucketName,
         objectName,
         file.buffer,
@@ -97,6 +166,9 @@ export class FileService {
         mimeType: file.mimetype,
       };
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
       this.logger.error(`Error uploading file: ${error.message}`, error.stack);
       throw new InternalServerErrorException(`Failed to upload file: ${error.message}`);
     }
@@ -126,9 +198,13 @@ export class FileService {
    */
   async deleteFile(fileName: string): Promise<void> {
     try {
-      await this.minioClient.removeObject(this.bucketName, fileName);
+      const client = await this.getMinioClientOrThrow();
+      await client.removeObject(this.bucketName, fileName);
       this.logger.log(`File deleted successfully: ${fileName}`);
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
       this.logger.error(`Error deleting file: ${error.message}`, error.stack);
       throw new InternalServerErrorException(`Failed to delete file: ${error.message}`);
     }
@@ -141,9 +217,13 @@ export class FileService {
    */
   async getFile(fileName: string): Promise<NodeJS.ReadableStream> {
     try {
-      const stream = await this.minioClient.getObject(this.bucketName, fileName);
+      const client = await this.getMinioClientOrThrow();
+      const stream = await client.getObject(this.bucketName, fileName);
       return stream;
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
       this.logger.error(`Error getting file: ${error.message}`, error.stack);
       throw new InternalServerErrorException(`Failed to get file: ${error.message}`);
     }
@@ -157,9 +237,13 @@ export class FileService {
    */
   async getPresignedUrl(fileName: string, expiry: number = 7 * 24 * 60 * 60): Promise<string> {
     try {
-      const url = await this.minioClient.presignedGetObject(this.bucketName, fileName, expiry);
+      const client = await this.getMinioClientOrThrow();
+      const url = await client.presignedGetObject(this.bucketName, fileName, expiry);
       return url;
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
       this.logger.error(`Error generating presigned URL: ${error.message}`, error.stack);
       throw new InternalServerErrorException(`Failed to generate presigned URL: ${error.message}`);
     }
@@ -172,9 +256,13 @@ export class FileService {
    */
   async fileExists(fileName: string): Promise<boolean> {
     try {
-      await this.minioClient.statObject(this.bucketName, fileName);
+      const client = await this.getMinioClientOrThrow();
+      await client.statObject(this.bucketName, fileName);
       return true;
     } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
       if (error.code === 'NotFound') {
         return false;
       }

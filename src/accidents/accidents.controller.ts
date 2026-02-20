@@ -25,6 +25,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { AccidentsService } from './accidents.service';
 import { CreateAccidentDto } from './dto/create-accident.dto';
 import { UpdateAccidentDto } from './dto/update-accident.dto';
@@ -126,6 +127,7 @@ export class AccidentsController {
   }
 
   @Post(':id/photos')
+  @Public()
   @ApiOperation({ summary: 'Upload photos for an accident report' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

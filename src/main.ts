@@ -22,12 +22,26 @@ async function bootstrap() {
 
   // Enable CORS
   const corsOriginsConfig = configService.get<string>('CORS_ORIGINS', '*');
+  const corsOrigins = corsOriginsConfig === '*' 
+    ? true // Allow all origins when '*' is specified
+    : corsOriginsConfig.split(',').map(origin => origin.trim());
+  
   app.enableCors({
-    origin: '*',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    origin: corsOrigins,
+    credentials: corsOriginsConfig !== '*', // Only allow credentials when specific origins are set
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers'
+    ],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   const port = configService.get('PORT', 3011);
@@ -43,7 +57,6 @@ async function bootstrap() {
     .setContact('City Light Pole Team', '', 'support@citylightpole.com')
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .addServer(`http://localhost:${port}`, 'Development Server')
-    .addServer('https://api.citylightpole.com', 'Production Server')
     .addBearerAuth(
       {
         type: 'http',
@@ -91,5 +104,4 @@ async function bootstrap() {
   console.log(`📄 OpenAPI JSON: http://localhost:${port}/api/docs-json`);
 }
 bootstrap();
-
 

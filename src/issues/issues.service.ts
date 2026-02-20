@@ -9,6 +9,7 @@ import { Repository, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { PoleIssue, IssueStatus } from './entities/pole-issue.entity';
 import { PoleIssueAttachment, AttachmentType } from './entities/pole-issue-attachment.entity';
+import { User, UserRole, UserStatus } from '../users/entities/user.entity';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueStatusDto } from './dto/update-issue-status.dto';
 import { QueryIssuesDto } from './dto/query-issues.dto';
@@ -29,12 +30,40 @@ export class IssuesService {
     private issuesRepository: Repository<PoleIssue>,
     @InjectRepository(PoleIssueAttachment)
     private attachmentsRepository: Repository<PoleIssueAttachment>,
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
     @Inject(forwardRef(() => PolesService))
     private polesService: PolesService,
     private configService: ConfigService,
     private notificationsService: NotificationsService,
     private fileService: FileService,
   ) {}
+
+  async createPublic(createIssueDto: CreateIssueDto) {
+    let reporter = await this.usersRepository.findOne({
+      where: { role: UserRole.SYSTEM_ADMIN, status: UserStatus.ACTIVE },
+    });
+
+    if (!reporter) {
+      reporter = await this.usersRepository.findOne({
+        where: { role: UserRole.ADMIN, status: UserStatus.ACTIVE },
+      });
+    }
+
+    if (!reporter) {
+      reporter = await this.usersRepository.findOne({
+        where: { status: UserStatus.ACTIVE },
+      });
+    }
+
+    if (!reporter) {
+      throw new BadRequestException(
+        'No active user found to attribute public issue report. Please seed users first.',
+      );
+    }
+
+    return this.create(createIssueDto, reporter.id);
+  }
 
   async create(createIssueDto: CreateIssueDto, reportedById: string) {
     // Verify pole exists
@@ -148,11 +177,14 @@ export class IssuesService {
 
     // Apply ordering
     const sortField = sortBy || 'createdAt';
-    const sortDirection = sortOrder || 'DESC';
+    const sortDirection = (sortOrder || 'DESC').toUpperCase() as 'ASC' | 'DESC';
 
     // Handle sorting with proper joins for related fields
     if (sortField === 'reportedBy') {
-      queryBuilder.orderBy('reportedBy.fullName', sortDirection);
+      queryBuilder
+        .orderBy('reportedBy.fullName', sortDirection)
+        .addOrderBy('issue.createdAt', 'DESC')
+        .addOrderBy('issue.id', 'DESC');
     } else {
       // Map frontend field names to database column names
       const fieldMapping: { [key: string]: string } = {
@@ -167,9 +199,13 @@ export class IssuesService {
       const dbField = fieldMapping[sortField];
       if (dbField) {
         queryBuilder.orderBy(dbField, sortDirection);
+        // Add deterministic secondary sort
+        queryBuilder.addOrderBy('issue.id', 'DESC');
       } else {
-        // Default sort
-        queryBuilder.orderBy('issue.createdAt', 'DESC');
+        // Default sort: newest first, then deterministic id.
+        queryBuilder
+          .orderBy('issue.createdAt', 'DESC')
+          .addOrderBy('issue.id', 'DESC');
       }
     }
 
@@ -351,4 +387,3 @@ export class IssuesService {
     await this.attachmentsRepository.remove(attachment);
   }
 }
-

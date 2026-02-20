@@ -106,6 +106,11 @@ export class UpdateAccidentDto {
   @Min(0)
   estimatedCost?: number;
 
+  @ApiPropertyOptional({ description: 'Reporter type (ignored, kept for frontend compatibility)' })
+  @IsOptional()
+  @IsString()
+  reporterType?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Object)

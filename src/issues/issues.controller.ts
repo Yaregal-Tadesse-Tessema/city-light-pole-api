@@ -43,7 +43,7 @@ export class IssuesController {
     @Body() createIssueDto: CreateIssueDto,
     @CurrentUser() user: any,
   ) {
-    return this.issuesService.create(createIssueDto, user.userId);
+    return await this.issuesService.create(createIssueDto, user.userId);
   }
 
   @Get()

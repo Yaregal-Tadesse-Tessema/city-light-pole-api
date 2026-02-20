@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IssuesService } from './issues.service';
 import { IssuesController } from './issues.controller';
+import { PublicIssuesController } from './public-issues.controller';
 import { ParkIssuesService } from './park-issues.service';
 import { ParkIssuesController } from './park-issues.controller';
 import { ParkingLotIssuesService } from './parking-lot-issues.service';
@@ -16,6 +17,7 @@ import { RiverSideProjectIssuesService } from './river-side-project-issues.servi
 import { RiverSideProjectIssuesController } from './river-side-project-issues.controller';
 import { PoleIssue } from './entities/pole-issue.entity';
 import { PoleIssueAttachment } from './entities/pole-issue-attachment.entity';
+import { User } from '../users/entities/user.entity';
 import { ParkIssue } from './entities/park-issue.entity';
 import { ParkIssueAttachment } from './entities/park-issue-attachment.entity';
 import { ParkingLotIssue } from './entities/parking-lot-issue.entity';
@@ -40,6 +42,7 @@ import { FileModule } from '../file/file.module';
     TypeOrmModule.forFeature([
       PoleIssue,
       PoleIssueAttachment,
+      User,
       ParkIssue,
       ParkIssueAttachment,
       ParkingLotIssue,
@@ -62,6 +65,7 @@ import { FileModule } from '../file/file.module';
   ],
   controllers: [
     IssuesController,
+    PublicIssuesController,
     ParkIssuesController,
     ParkingLotIssuesController,
     MuseumIssuesController,

@@ -69,5 +69,10 @@ export class CreateAccidentDto {
   @IsOptional()
   @IsString()
   claimReferenceNumber?: string;
+
+  @ApiPropertyOptional({ description: 'Reporter type (ignored, kept for frontend compatibility)' })
+  @IsOptional()
+  @IsString()
+  reporterType?: string;
 }
 

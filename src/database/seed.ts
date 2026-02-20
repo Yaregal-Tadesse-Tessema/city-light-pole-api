@@ -21,51 +21,80 @@ async function seed() {
 
   console.log('🌱 Starting database seed...');
 
-  // Seed Users
+  // Add SYSTEM_ADMIN to enum if it doesn't exist
+  try {
+    await dataSource.query(`
+      ALTER TYPE "public"."users_role_enum"
+      ADD VALUE IF NOT EXISTS 'SYSTEM_ADMIN'
+    `);
+    console.log('✅ Added SYSTEM_ADMIN to users_role_enum');
+  } catch (error) {
+    // Enum value might already exist, ignore error
+    console.log('ℹ️  SYSTEM_ADMIN enum value check completed');
+  }
+
+  // Seed Users - Create users for ADMIN, SYSTEM_ADMIN, MAINTENANCE_ENGINEER, and SUPERVISOR_VIEWER roles
   const userRepository = dataSource.getRepository(User);
   
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const engineerPassword = await bcrypt.hash('engineer123', 10);
-  const viewerPassword = await bcrypt.hash('viewer123', 10);
-
-  const admin = await userRepository.findOne({ where: { email: 'admin@city.gov' } });
-  if (!admin) {
-    await userRepository.save({
+  const usersToSeed = [
+    {
       email: 'admin@city.gov',
-      password: adminPassword,
+      password: 'admin123',
       fullName: 'Admin User',
       phone: '+1234567890',
       role: UserRole.ADMIN,
-      status: UserStatus.ACTIVE,
-    });
-    console.log('✅ Created admin user: admin@city.gov / admin123');
-  }
-
-  const engineer = await userRepository.findOne({ where: { email: 'engineer@city.gov' } });
-  if (!engineer) {
-    await userRepository.save({
-      email: 'engineer@city.gov',
-      password: engineerPassword,
-      fullName: 'Maintenance Engineer',
+    },
+    {
+      email: 'system-admin@city.gov',
+      password: 'systemadmin123',
+      fullName: 'System Administrator',
       phone: '+1234567891',
-      role: UserRole.MAINTENANCE_ENGINEER,
-      status: UserStatus.ACTIVE,
-    });
-    console.log('✅ Created engineer user: engineer@city.gov / engineer123');
-  }
-
-  const viewer = await userRepository.findOne({ where: { email: 'viewer@city.gov' } });
-  if (!viewer) {
-    await userRepository.save({
-      email: 'viewer@city.gov',
-      password: viewerPassword,
-      fullName: 'Supervisor Viewer',
+      role: UserRole.SYSTEM_ADMIN,
+    },
+    {
+      email: 'engineer@city.gov',
+      password: 'engineer123',
+      fullName: 'Maintenance Engineer',
       phone: '+1234567892',
+      role: UserRole.MAINTENANCE_ENGINEER,
+    },
+    {
+      email: 'viewer@city.gov',
+      password: 'viewer123',
+      fullName: 'Supervisor Viewer',
+      phone: '+1234567893',
       role: UserRole.SUPERVISOR_VIEWER,
-      status: UserStatus.ACTIVE,
-    });
-    console.log('✅ Created viewer user: viewer@city.gov / viewer123');
+    },
+  ];
+
+  console.log('\n👥 Seeding users for all roles...\n');
+  
+  for (const userData of usersToSeed) {
+    const existing = await userRepository.findOne({ where: { email: userData.email } });
+    
+    if (!existing) {
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      
+      await userRepository.save({
+        email: userData.email,
+        password: hashedPassword,
+        fullName: userData.fullName,
+        phone: userData.phone,
+        role: userData.role,
+        status: UserStatus.ACTIVE,
+      });
+      
+      console.log(`✅ Created ${userData.role}: ${userData.email} / ${userData.password}`);
+    } else {
+      console.log(`⏭️  User ${userData.email} already exists`);
+    }
   }
+  
+  console.log('\n📋 All seeded user credentials:\n');
+  usersToSeed.forEach(user => {
+    console.log(`   ${user.role.padEnd(25)} - Email: ${user.email.padEnd(25)} Password: ${user.password}`);
+  });
+  console.log('');
 
   // Seed Roles
   const roleRepository = dataSource.getRepository(Role);
@@ -362,10 +391,11 @@ async function seed() {
     // Create 15 material requests
     for (let i = 1; i <= 15; i++) {
       const engineer = await userRepository.findOne({ where: { role: UserRole.MAINTENANCE_ENGINEER } });
+      const admin = await userRepository.findOne({ where: { role: UserRole.ADMIN } });
       const schedule = maintenanceSchedules[i % maintenanceSchedules.length];
 
       const materialRequest = await materialRequestRepository.save({
-        requestedById: engineer?.id || admin.id,
+        requestedById: engineer?.id || admin?.id,
         maintenanceScheduleId: schedule?.id,
         status: i <= 8 ? MaterialRequestStatus.APPROVED : i <= 12 ? MaterialRequestStatus.PENDING : MaterialRequestStatus.REJECTED,
         notes: `Material request for maintenance ${i}`,
@@ -408,10 +438,11 @@ async function seed() {
     for (let i = 1; i <= 12; i++) {
       const supplier = suppliers[Math.floor(Math.random() * suppliers.length)];
       const engineer = await userRepository.findOne({ where: { role: UserRole.MAINTENANCE_ENGINEER } });
+      const admin = await userRepository.findOne({ where: { role: UserRole.ADMIN } });
 
       const purchaseRequest = await purchaseRequestRepository.save({
         supplierName: supplier,
-        requestedById: engineer?.id || admin.id,
+        requestedById: engineer?.id || admin?.id,
         status: i <= 6 ? PurchaseRequestStatus.RECEIVED : i <= 9 ? PurchaseRequestStatus.APPROVED : PurchaseRequestStatus.PENDING,
         totalCost: 0, // Will be calculated
         notes: `Purchase request ${i} from ${supplier}`,
@@ -461,13 +492,14 @@ async function seed() {
     for (let i = 1; i <= 50; i++) {
       const pole = poles[Math.floor(Math.random() * poles.length)];
       const engineer = await userRepository.findOne({ where: { role: UserRole.MAINTENANCE_ENGINEER } });
+      const admin = await userRepository.findOne({ where: { role: UserRole.ADMIN } });
 
       const issueTypes = ['Bulb burnt out', 'Wiring fault', 'Pole damage', 'Power outage', 'LED display malfunction', 'Camera not working', 'Phone charger broken'];
       const issueType = issueTypes[Math.floor(Math.random() * issueTypes.length)];
 
       await issueRepository.save({
         poleCode: pole.code,
-        reportedById: engineer?.id || admin.id,
+        reportedById: engineer?.id || admin?.id,
         description: `${issueType} on pole ${pole.code}`,
         status: i <= 25 ? IssueStatus.RESOLVED : i <= 40 ? IssueStatus.IN_PROGRESS : IssueStatus.REPORTED,
         priority: Math.random() < 0.7 ? 'MEDIUM' : Math.random() < 0.9 ? 'HIGH' : 'LOW',
@@ -494,6 +526,7 @@ async function seed() {
     for (let i = 1; i <= 30; i++) {
       const pole = poles[Math.floor(Math.random() * poles.length)];
       const engineer = await userRepository.findOne({ where: { role: UserRole.MAINTENANCE_ENGINEER } });
+      const admin = await userRepository.findOne({ where: { role: UserRole.ADMIN } });
 
       const maintenanceTypes = ['Routine inspection', 'Bulb replacement', 'Wiring check', 'Cleaning', 'LED maintenance', 'Camera inspection'];
       const maintenanceType = maintenanceTypes[Math.floor(Math.random() * maintenanceTypes.length)];
@@ -504,7 +537,7 @@ async function seed() {
         scheduledDate: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
         status: i <= 15 ? ScheduleStatus.COMPLETED : i <= 22 ? ScheduleStatus.STARTED : ScheduleStatus.REQUESTED,
         priority: Math.random() < 0.6 ? 'MEDIUM' : Math.random() < 0.8 ? 'LOW' : 'HIGH',
-        assignedToId: engineer?.id || admin.id,
+        assignedToId: engineer?.id || admin?.id,
         estimatedDuration: Math.floor(Math.random() * 4) + 1, // 1-4 hours
         notes: `Maintenance schedule ${i} for ${pole.subcity} area`,
         completedDate: i <= 15 ? new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1) : null,

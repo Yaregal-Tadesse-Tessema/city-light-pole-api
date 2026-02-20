@@ -46,6 +46,6 @@ lerna-debug.log*
 
 # OpenAPI export
 openapi.json
-
+CHANGELOG_COMPACT.md
 
 

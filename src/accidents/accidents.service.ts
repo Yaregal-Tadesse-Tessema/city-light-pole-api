@@ -16,6 +16,7 @@ import { PolesService } from '../poles/poles.service';
 import { PoleStatus } from '../poles/entities/light-pole.entity';
 import { FileService } from '../file/file.service';
 import { DamagedComponentsService } from './damaged-components.service';
+import { User, UserRole, UserStatus } from '../users/entities/user.entity';
 import { CreateAccidentDto } from './dto/create-accident.dto';
 import { UpdateAccidentDto } from './dto/update-accident.dto';
 import { QueryAccidentsDto } from './dto/query-accidents.dto';
@@ -55,9 +56,13 @@ export class AccidentsService {
 
     try {
       const incidentId = await this.generateIncidentId();
+      const normalizedPoleId = createAccidentDto.poleId?.trim()
+        ? createAccidentDto.poleId.trim()
+        : null;
 
       const accident = this.accidentRepository.create({
         ...createAccidentDto,
+        poleId: normalizedPoleId,
         incidentId,
         reportedById: userId,
         accidentDate: new Date(createAccidentDto.accidentDate),
@@ -66,8 +71,8 @@ export class AccidentsService {
       const savedAccident = await queryRunner.manager.save(accident);
 
       // Update pole status if pole is linked
-      if (createAccidentDto.poleId) {
-        await this.polesService.update(createAccidentDto.poleId, { status: PoleStatus.FAULT_DAMAGED });
+      if (normalizedPoleId) {
+        await this.polesService.update(normalizedPoleId, { status: PoleStatus.FAULT_DAMAGED });
       }
 
       await queryRunner.commitTransaction();
@@ -78,6 +83,36 @@ export class AccidentsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async createPublic(createAccidentDto: CreateAccidentDto): Promise<Accident> {
+    const userRepo = this.dataSource.getRepository(User);
+
+    // Use an active admin/system user as reporter for public submissions.
+    let reporter = await userRepo.findOne({
+      where: { role: UserRole.SYSTEM_ADMIN, status: UserStatus.ACTIVE },
+    });
+
+    if (!reporter) {
+      reporter = await userRepo.findOne({
+        where: { role: UserRole.ADMIN, status: UserStatus.ACTIVE },
+      });
+    }
+
+    if (!reporter) {
+      reporter = await userRepo.findOne({
+        where: { status: UserStatus.ACTIVE },
+        order: { createdAt: 'ASC' },
+      });
+    }
+
+    if (!reporter) {
+      throw new BadRequestException(
+        'No active user found to attribute public accident report. Please seed users first.',
+      );
+    }
+
+    return this.create(createAccidentDto, reporter.id);
   }
 
   async findAll(query: QueryAccidentsDto): Promise<{ data: Accident[]; total: number; page: number; limit: number }> {
