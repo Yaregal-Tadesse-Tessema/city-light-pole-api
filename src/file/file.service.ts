@@ -17,8 +17,6 @@ export class FileService {
   private readonly minioPort: number;
   private readonly useSSL: boolean;
   private readonly minioEnabled: boolean;
-  private minioReady = false;
-  private minioInitPromise: Promise<void> | null = null;
 
   constructor(private configService: ConfigService) {
     // MinIO configuration
@@ -40,43 +38,6 @@ export class FileService {
       accessKey: '93WKK0YPWPH23MMN6FON',
       secretKey: 'AASXnjGFzUblLzzdA3fUePQUNNxzfoCwXo+CgaIP',
     });
-
-    // Initialize bucket in the background. API startup should not depend on MinIO availability.
-    void this.initializeMinio();
-  }
-
-  /**
-   * Ensure bucket exists and mark MinIO readiness.
-   */
-  private async initializeMinio(): Promise<void> {
-    if (!this.minioClient) {
-      return;
-    }
-    if (this.minioInitPromise) {
-      return this.minioInitPromise;
-    }
-
-    this.minioInitPromise = (async () => {
-      try {
-        const exists = await this.minioClient!.bucketExists(this.bucketName);
-        if (!exists) {
-          await this.minioClient!.makeBucket(this.bucketName, 'us-east-1');
-          this.logger.log(`Bucket "${this.bucketName}" created successfully`);
-        } else {
-          this.logger.log(`Bucket "${this.bucketName}" already exists`);
-        }
-        this.minioReady = true;
-      } catch (error) {
-        this.minioReady = false;
-        this.logger.warn(
-          `MinIO unavailable. File endpoints will be disabled until MinIO is reachable: ${error.message}`,
-        );
-      } finally {
-        this.minioInitPromise = null;
-      }
-    })();
-
-    return this.minioInitPromise;
   }
 
   private async getMinioClientOrThrow(): Promise<MinioClient> {
@@ -85,12 +46,6 @@ export class FileService {
     }
     if (!this.minioClient) {
       throw new ServiceUnavailableException('File storage client is not configured');
-    }
-    if (!this.minioReady) {
-      await this.initializeMinio();
-    }
-    if (!this.minioReady) {
-      throw new ServiceUnavailableException('File storage is unavailable. Ensure MinIO is running.');
     }
 
     return this.minioClient;

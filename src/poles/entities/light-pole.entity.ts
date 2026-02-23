@@ -92,6 +92,12 @@ export class LightPole {
   @Column()
   street: string;
 
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  localAreaName: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  localAreaNameAm: string | null;
+
   @Column('decimal', { precision: 10, scale: 8, nullable: true })
   gpsLat: number | null;
 
@@ -177,5 +183,4 @@ export class LightPole {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
 

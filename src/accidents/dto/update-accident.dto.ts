@@ -10,6 +10,7 @@ import {
   Max,
   IsUUID,
   IsArray,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -69,6 +70,24 @@ export class UpdateAccidentDto {
   @IsOptional()
   @IsString()
   driverName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(/^$|^(?:\+251)?[1-9]\d{8}$/, {
+    message: 'driverPhoneNumber must be +251 followed by 9 digits and must not start with 0',
+  })
+  driverPhoneNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  driverLicenseNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  driverNationalIdNumber?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

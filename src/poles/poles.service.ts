@@ -50,6 +50,8 @@ export class PolesService {
       code: createPoleDto.code,
       subcity: createPoleDto.subcity,
       street: createPoleDto.street,
+      localAreaName: createPoleDto.localAreaName ?? null,
+      localAreaNameAm: createPoleDto.localAreaNameAm ?? null,
       heightMeters: createPoleDto.heightMeters,
       powerRatingWatt: createPoleDto.powerRatingWatt,
       poleType: createPoleDto.poleType || 'STANDARD',
@@ -93,6 +95,8 @@ export class PolesService {
       district,
       search,
       street,
+      localAreaName,
+      localAreaNameAm,
       sortBy,
       sortDirection,
     } = queryDto;
@@ -124,9 +128,17 @@ export class PolesService {
       queryBuilder.andWhere('pole.street = :street', { street });
     }
 
+    if (localAreaName) {
+      queryBuilder.andWhere('pole.localAreaName = :localAreaName', { localAreaName });
+    }
+
+    if (localAreaNameAm) {
+      queryBuilder.andWhere('pole.localAreaNameAm = :localAreaNameAm', { localAreaNameAm });
+    }
+
     if (search) {
       queryBuilder.andWhere(
-        '(pole.code ILIKE :search OR pole.street ILIKE :search OR pole.subcity ILIKE :search)',
+        '(pole.code ILIKE :search OR pole.street ILIKE :search OR pole.subcity ILIKE :search OR pole.localAreaName ILIKE :search OR pole.localAreaNameAm ILIKE :search)',
         { search: `%${search}%` },
       );
     }
@@ -283,6 +295,8 @@ export class PolesService {
         'pole.code',
         'pole.subcity',
         'pole.street',
+        'pole.localAreaName',
+        'pole.localAreaNameAm',
         'pole.status',
         'pole.polePosition',
         'pole.condition',
@@ -304,4 +318,3 @@ export class PolesService {
     return poles;
   }
 }
-

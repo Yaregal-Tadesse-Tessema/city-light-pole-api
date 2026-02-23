@@ -90,6 +90,27 @@ export class ReportsService {
     };
   }
 
+  async getPolesByType(subcity?: string) {
+    const queryBuilder = this.polesRepository.createQueryBuilder('pole');
+
+    if (subcity) {
+      queryBuilder.where('pole.subcity = :subcity', { subcity });
+    }
+
+    queryBuilder
+      .select('pole.poleType', 'poleType')
+      .addSelect('COUNT(DISTINCT pole.code)', 'count')
+      .groupBy('pole.poleType')
+      .orderBy('pole.poleType', 'ASC');
+
+    const results = await queryBuilder.getRawMany();
+
+    return results.map((result) => ({
+      poleType: result.poleType,
+      count: parseInt(result.count, 10),
+    }));
+  }
+
   async getFaultyByDistrict(subcity?: string, assetType?: string) {
     if (!assetType || assetType === 'pole') {
       return this.getFaultyPolesByDistrict(subcity);
@@ -446,4 +467,3 @@ export class ReportsService {
       }));
   }
 }
-

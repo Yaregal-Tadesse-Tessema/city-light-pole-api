@@ -7,12 +7,15 @@ export class AddMaintenanceCode1766432282425 implements MigrationInterface {
     // Add the maintenanceCode column as nullable
     await queryRunner.query(`
       ALTER TABLE "maintenance_schedules"
-      ADD COLUMN "maintenanceCode" varchar
+      ADD COLUMN IF NOT EXISTS "maintenanceCode" varchar
     `);
 
-    // Generate unique codes for existing records
+    // Generate unique codes only for records that do not already have one.
     const schedules = await queryRunner.query(`
-      SELECT id FROM maintenance_schedules ORDER BY "createdAt" ASC
+      SELECT id
+      FROM maintenance_schedules
+      WHERE "maintenanceCode" IS NULL
+      ORDER BY "createdAt" ASC
     `);
 
     for (let i = 0; i < schedules.length; i++) {
@@ -31,15 +34,15 @@ export class AddMaintenanceCode1766432282425 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "IDX_maintenance_code" ON "maintenance_schedules" ("maintenanceCode")
+      CREATE UNIQUE INDEX IF NOT EXISTS "IDX_maintenance_code" ON "maintenance_schedules" ("maintenanceCode")
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop the unique index
-    await queryRunner.query(`DROP INDEX "IDX_maintenance_code"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_maintenance_code"`);
 
     // Drop the column
-    await queryRunner.query(`ALTER TABLE "maintenance_schedules" DROP COLUMN "maintenanceCode"`);
+    await queryRunner.query(`ALTER TABLE "maintenance_schedules" DROP COLUMN IF EXISTS "maintenanceCode"`);
   }
 }

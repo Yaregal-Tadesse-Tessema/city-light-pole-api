@@ -22,10 +22,6 @@ export class CreateIssueDto {
   @IsUrl({}, { each: true })
   attachments?: string[];
 
-  @ApiProperty({ required: false, example: 'INTERNAL', description: 'Reporter type (ignored, kept for frontend compatibility)' })
-  @IsOptional()
-  @IsString()
-  reporterType?: string;
 }
 
 

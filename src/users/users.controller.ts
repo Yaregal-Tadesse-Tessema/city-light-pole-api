@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Param,
   Body,
   UseGuards,
@@ -14,6 +15,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from './entities/user.entity';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -28,6 +31,14 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users (ADMIN only)' })
   async findAll() {
     return this.usersService.findAll();
+  }
+
+  @Post()
+  @Roles(UserRole.ADMIN, UserRole.SYSTEM_ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Create user (ADMIN/SYSTEM_ADMIN only)' })
+  async create(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.createByAdmin(createUserDto);
   }
 
   @Patch(':id/role')
@@ -50,6 +61,17 @@ export class UsersController {
     @Body() updateStatusDto: UpdateUserStatusDto,
   ) {
     return this.usersService.updateStatus(id, updateStatusDto);
+  }
+
+  @Patch(':id')
+  @Roles(UserRole.ADMIN, UserRole.SYSTEM_ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Update user (ADMIN/SYSTEM_ADMIN only)' })
+  async updateUser(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.usersService.updateUser(id, updateUserDto);
   }
 }
 

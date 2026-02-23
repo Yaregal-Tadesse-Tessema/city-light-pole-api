@@ -9,6 +9,7 @@ import {
   Max,
   ValidateIf,
   IsDateString,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -34,6 +35,18 @@ export class CreatePoleDto {
   @ApiProperty({ example: 'Main Street', description: 'Street name' })
   @IsString()
   street: string;
+
+  @ApiProperty({ example: 'Bole Medhanialem', required: false, description: 'Local area name (English)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  localAreaName?: string;
+
+  @ApiProperty({ example: 'ቦሌ መድሃኒዓለም', required: false, description: 'Local area name (Amharic)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  localAreaNameAm?: string;
 
   @ApiProperty({ example: 9.012345, required: false, description: 'GPS Latitude (-90 to 90)' })
   @IsOptional()
@@ -107,5 +120,4 @@ export class CreatePoleDto {
   @IsOptional()
   district?: District;
 }
-
 

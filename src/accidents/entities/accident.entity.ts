@@ -64,6 +64,21 @@ export class Accident {
   driverName: string;
 
   @Column({ nullable: true })
+  driverPhoneNumber: string;
+
+  @Column({ nullable: true })
+  driverLicenseNumber: string;
+
+  @Column({ nullable: true })
+  driverLicenseFileUrl: string;
+
+  @Column({ nullable: true })
+  driverLicenseFileName: string;
+
+  @Column({ nullable: true })
+  driverNationalIdNumber: string;
+
+  @Column({ nullable: true })
   insuranceCompany: string;
 
   @Column({ nullable: true })

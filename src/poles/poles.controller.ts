@@ -41,14 +41,16 @@ export class PolesController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10)' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search in code, subcity, or street' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search in code, subcity, street, or local area names' })
   @ApiQuery({ name: 'subcity', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['OPERATIONAL', 'FAULT_DAMAGED', 'UNDER_MAINTENANCE', 'REPLACED'] })
   @ApiQuery({ name: 'polePosition', required: false, enum: ['Up', 'Down', 'Middle'] })
   @ApiQuery({ name: 'condition', required: false, enum: ['Not in Place', 'Good', 'Bend', 'Broken Lamp', 'Both Pole & Lamp Broken'] })
   @ApiQuery({ name: 'district', required: false, enum: ['west', 'north', 'south', 'east', 'center'] })
   @ApiQuery({ name: 'street', required: false, type: String, description: 'Filter by exact street name' })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['subcity', 'street'], description: 'Field to sort by' })
+  @ApiQuery({ name: 'localAreaName', required: false, type: String, description: 'Filter by exact local area name (English)' })
+  @ApiQuery({ name: 'localAreaNameAm', required: false, type: String, description: 'Filter by exact local area name (Amharic)' })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['subcity', 'street', 'localAreaName', 'localAreaNameAm'], description: 'Field to sort by' })
   @ApiQuery({ name: 'sortDirection', required: false, enum: ['asc', 'desc'], description: 'Sort direction' })
   async findAll(@Query() queryDto: QueryPolesDto) {
     return await this.polesService.findAll(queryDto);
@@ -100,5 +102,4 @@ export class PolesController {
     return await this.polesService.getMaintenanceHistory(code);
   }
 }
-
 

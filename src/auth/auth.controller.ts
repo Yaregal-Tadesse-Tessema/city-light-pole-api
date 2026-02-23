@@ -3,7 +3,11 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { SignupDto } from './dto/signup.dto';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { UserRole } from '../users/entities/user.entity';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -32,29 +36,9 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  @Post('signup')
-  @ApiOperation({ summary: 'Public signup', description: 'Create a new user account (public endpoint)' })
-  @ApiBody({ type: SignupDto })
-  @ApiResponse({ 
-    status: 201, 
-    description: 'User registered successfully',
-    schema: {
-      example: {
-        id: 'uuid',
-        email: 'user@example.com',
-        fullName: 'John Doe',
-        role: 'SUPERVISOR_VIEWER',
-        status: 'ACTIVE',
-        createdAt: '2025-01-20T10:00:00Z',
-      },
-    },
-  })
-  @ApiResponse({ status: 400, description: 'Validation error or user already exists' })
-  async signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto);
-  }
-
   @Post('register')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SYSTEM_ADMIN)
   @ApiOperation({ summary: 'Register new user', description: 'Create a new user account (ADMIN only)' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({ 
@@ -75,5 +59,3 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 }
-
-

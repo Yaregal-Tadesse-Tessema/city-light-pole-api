@@ -137,7 +137,7 @@ import { PoleComponent } from './components/entities/pole-component.entity';
               Component,
               PoleComponent,
             ],
-            synchronize: configService.get('NODE_ENV') === 'development',
+            synchronize: true,
             logging: configService.get('NODE_ENV') === 'development',
             ssl:
               configService.get('NODE_ENV') === 'production'

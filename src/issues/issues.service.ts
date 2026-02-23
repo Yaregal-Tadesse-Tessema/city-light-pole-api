@@ -79,7 +79,6 @@ export class IssuesService {
         ]),
       },
     });
-
     if (unclosedIssue) {
       throw new BadRequestException(
         `Cannot create issue: There is already an unclosed issue (${unclosedIssue.status}) for pole ${createIssueDto.poleCode}. Please resolve or close the existing issue first.`,

@@ -283,6 +283,22 @@ export class AccidentsService {
             <span class="value">${accident.driverName || 'N/A'}</span>
           </div>
           <div class="field">
+            <span class="label">Driver Phone Number:</span>
+            <span class="value">${accident.driverPhoneNumber || 'N/A'}</span>
+          </div>
+          <div class="field">
+            <span class="label">Driver License Number:</span>
+            <span class="value">${accident.driverLicenseNumber || 'N/A'}</span>
+          </div>
+          <div class="field">
+            <span class="label">Driver National ID Number:</span>
+            <span class="value">${accident.driverNationalIdNumber || 'N/A'}</span>
+          </div>
+          <div class="field">
+            <span class="label">Driver License File:</span>
+            <span class="value">${accident.driverLicenseFileUrl || 'N/A'}</span>
+          </div>
+          <div class="field">
             <span class="label">Insurance Company:</span>
             <span class="value">${accident.insuranceCompany || 'N/A'}</span>
           </div>
@@ -681,6 +697,17 @@ export class AccidentsService {
     return this.attachmentRepository.save(attachment);
   }
 
+  async addDriverLicense(accidentId: string, file: Express.Multer.File): Promise<Accident> {
+    const accident = await this.findOne(accidentId);
+
+    const uploadResult = await this.fileService.uploadFile(file, `accidents/${accidentId}/driver-license`);
+
+    accident.driverLicenseFileUrl = uploadResult.url;
+    accident.driverLicenseFileName = uploadResult.originalName;
+
+    return this.accidentRepository.save(accident);
+  }
+
   async removePhoto(photoId: string, userId: string): Promise<void> {
     const photo = await this.photoRepository.findOne({
       where: { id: photoId },
@@ -712,7 +739,7 @@ export class AccidentsService {
     const [totalAccidents, monthlyAccidents, totalEstimatedCost, claimsStats] = await Promise.all([
       this.accidentRepository.count(),
       this.accidentRepository.count({
-        where: { createdAt: { $gte: startOfMonth } as any },
+        where: { createdAt: MoreThanOrEqual(startOfMonth) },
       }),
       this.accidentRepository
         .createQueryBuilder('accident')
@@ -721,8 +748,8 @@ export class AccidentsService {
       this.accidentRepository
         .createQueryBuilder('accident')
         .select([
-          'COUNT(CASE WHEN claimStatus = :submitted THEN 1 END) as submitted',
-          'COUNT(CASE WHEN claimStatus = :paid THEN 1 END) as paid',
+          'COUNT(CASE WHEN accident."claimStatus" = :submitted THEN 1 END) as submitted',
+          'COUNT(CASE WHEN accident."claimStatus" = :paid THEN 1 END) as paid',
         ])
         .setParameters({ submitted: ClaimStatus.SUBMITTED, paid: ClaimStatus.PAID })
         .getRawOne(),

@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFiles,
+  UploadedFile,
   BadRequestException,
   ParseUUIDPipe,
   Res,
@@ -22,7 +23,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -207,6 +208,39 @@ export class AccidentsController {
     return Promise.all(
       files.map(file => this.accidentsService.addAttachment(id, file, attachmentType, description))
     );
+  }
+
+  @Post(':id/driver-license')
+  @Public()
+  @ApiOperation({ summary: 'Upload driver license file for an accident report' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['file'],
+    },
+  })
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, callback) => {
+      if (!file.mimetype.match(/\/(pdf|jpg|jpeg|png)$/)) {
+        return callback(new BadRequestException('Only PDF and image files are allowed'), false);
+      }
+      callback(null, true);
+    },
+  }))
+  uploadDriverLicense(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Driver license file is required');
+    }
+
+    return this.accidentsService.addDriverLicense(id, file);
   }
 
   @Delete('photos/:photoId')

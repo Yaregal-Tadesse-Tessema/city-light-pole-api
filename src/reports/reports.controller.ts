@@ -16,6 +16,13 @@ export class ReportsController {
     return await this.reportsService.getSummary();
   }
 
+  @Get('poles-by-type')
+  @ApiOperation({ summary: 'Get poles grouped by pole type' })
+  @ApiQuery({ name: 'subcity', required: false, type: String, description: 'Limit results to a specific subcity' })
+  async getPolesByType(@Query('subcity') subcity?: string) {
+    return await this.reportsService.getPolesByType(subcity);
+  }
+
   @Get('faulty-by-district')
   @ApiOperation({ summary: 'Get faulty assets grouped by subcity' })
   @ApiQuery({ name: 'subcity', required: false, type: String, description: 'Filter by specific subcity' })

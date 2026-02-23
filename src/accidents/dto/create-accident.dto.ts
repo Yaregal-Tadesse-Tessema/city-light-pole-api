@@ -9,6 +9,7 @@ import {
   Min,
   Max,
   IsUUID,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AccidentType } from '../enums/accident.enums';
@@ -59,6 +60,24 @@ export class CreateAccidentDto {
   @IsOptional()
   @IsString()
   driverName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(/^$|^(?:\+251)?[1-9]\d{8}$/, {
+    message: 'driverPhoneNumber must be +251 followed by 9 digits and must not start with 0',
+  })
+  driverPhoneNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  driverLicenseNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  driverNationalIdNumber?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

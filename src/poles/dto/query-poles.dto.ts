@@ -59,20 +59,29 @@ export class QueryPolesDto {
   @IsString()
   street?: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  localAreaName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  localAreaNameAm?: string;
+
   @ApiProperty({
     required: false,
-    enum: ['subcity', 'street', 'polePosition', 'condition', 'district'],
+    enum: ['subcity', 'street', 'localAreaName', 'localAreaNameAm', 'polePosition', 'condition', 'district'],
     description: 'Field to sort by',
   })
   @IsOptional()
   @IsString()
-  sortBy?: 'subcity' | 'street';
+  sortBy?: 'subcity' | 'street' | 'localAreaName' | 'localAreaNameAm';
 
   @ApiProperty({ required: false, enum: ['asc', 'desc'], description: 'Sort direction' })
   @IsOptional()
   @IsString()
   sortDirection?: 'asc' | 'desc';
 }
-
 
 
