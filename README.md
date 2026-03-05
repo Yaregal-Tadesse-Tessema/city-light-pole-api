@@ -50,18 +50,7 @@ PUBLIC_BASE_URL=http://localhost:3011
 
 # Upload Directory
 UPLOAD_DIR=./uploads
-
-# Optional services
-MINIO_ENABLED=true
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_USE_SSL=false
-BREVO_API_KEY=your-brevo-api-key
 ```
-
-Important: This project uses only one env file, `.env`.
-- There is no `env.example`, `.env.local`, or `.env.production` workflow.
-- For production, create/copy `.env` manually on the server with production values.
 
 ### 3. Setup PostgreSQL Database
 
@@ -122,10 +111,6 @@ After running the seed script, you can login with:
 - `npm run migration:run` - Run pending migrations
 - `npm run migration:revert` - Revert last migration
 - `npm run openapi:export` - Export OpenAPI schema to `openapi.json`
-
-## Production Deployment Note
-
-Before starting the API in production, manually create a `.env` file in the API root with production values.
 
 ## API Endpoints
 
