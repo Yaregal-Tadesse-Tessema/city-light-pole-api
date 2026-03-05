@@ -14,7 +14,7 @@ function validateEnv() {
   
   if (!fs.existsSync(envPath)) {
     console.error('❌ .env file not found!');
-    console.error('Please create a .env file based on .env.example');
+    console.error('Please create a .env file in the API project root with all required variables.');
     process.exit(1);
   }
 
